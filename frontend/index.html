@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rosal BI — El Rosal, Cundinamarca</title>
+<style>
+  :root{ --navy:#11233F; --green:#2E8B57; --bg:#F3F5F7; --border:#E2E6EA; --text:#1A2433; --text-muted:#5B6B7A; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text)}
+  header{background:var(--navy);color:#fff;padding:3rem 1.5rem;text-align:center}
+  header h1{font-size:28px;margin-bottom:8px}
+  header p{color:#B9C4D4;font-size:14px}
+  main{max-width:800px;margin:2rem auto;padding:0 1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media (max-width:600px){ main{grid-template-columns:1fr} }
+  a.card{
+    display:block;background:#fff;border:1px solid var(--border);border-radius:12px;
+    padding:1.6rem;text-decoration:none;color:var(--text);transition:box-shadow .15s;
+  }
+  a.card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
+  a.card h2{font-size:17px;color:var(--navy);margin-bottom:8px}
+  a.card p{font-size:13.5px;color:var(--text-muted);line-height:1.5}
+  footer{text-align:center;font-size:11px;color:var(--text-muted);padding:2rem 1rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏛️ Rosal BI</h1>
+  <p>Plataforma de inteligencia de datos y datos abiertos — Alcaldía de El Rosal, Cundinamarca</p>
+</header>
+<main>
+  <a class="card" href="dashboard/index.html">
+    <h2>📊 Consola de datos abiertos</h2>
+    <p>Busca datasets de datos.gov.co, carga tu propio Excel/CSV o API, y obtén al instante totales, hallazgos y gráficas — sin configurar nada.</p>
+  </a>
+  <a class="card" href="verificador-calidad/index.html">
+    <h2>✅ Verificador de calidad</h2>
+    <p>Revisa tu Excel o CSV contra el listado oficial de errores de datos.gov.co antes de publicarlo, y descárgalo con los problemas marcados.</p>
+  </a>
+</main>
+<footer>Concurso Datos al Ecosistema 2026: IA para Colombia — Ministerio TIC</footer>
+</body>
+</html>

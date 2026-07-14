@@ -1,0 +1,4 @@
+nombre,categoria,fuente,ubicacion,frecuencia_actualizacion,responsable
+Tramites y servicios SUIT,Tramites,SUIT,datasets/originales/tramites_suit.xlsx,Anual,Secretaria de Gobierno
+Poblacion municipal,Demografia y Poblacion,SISBEN,datasets/originales/poblacion.xlsx,Anual,Secretaria de Planeacion
+Plan Anual de Adquisiciones,Presupuesto y Finanzas,SECOP,https://www.datos.gov.co/resource/xxxx-xxxx.json,Mensual,Secretaria de Hacienda

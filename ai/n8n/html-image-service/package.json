@@ -1,0 +1,13 @@
+{
+  "name": "html-image-service",
+  "version": "1.0.0",
+  "description": "Convierte HTML en una imagen PNG exacta usando Puppeteer, para el flujo del asistente de datos abiertos de El Rosal.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "puppeteer": "^22.15.0"
+  }
+}

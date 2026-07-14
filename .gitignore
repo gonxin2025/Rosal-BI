@@ -1,0 +1,33 @@
+# Dependencias
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Variables de entorno y credenciales
+.env
+.env.*
+*.key
+credentials.json
+
+# Builds y temporales
+dist/
+build/
+*.log
+.DS_Store
+Thumbs.db
+
+# Datos sensibles (no versionar datos crudos con informacion personal)
+datasets/originales/*.xlsx
+datasets/originales/*.csv
+!datasets/originales/.gitkeep
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+
+# Salidas generadas (PDFs, imagenes exportadas)
+*.pdf
+!docs/**/*.pdf

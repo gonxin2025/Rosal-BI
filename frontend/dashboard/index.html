@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Rosal — Asistente de datos abiertos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#11233F; --navy-light:#1C3A63; --green:#2E8B57; --green-light:#E5F3EC;
+    --bg:#F3F5F7; --card:#FFFFFF; --border:#E2E6EA; --text:#1A2433; --text-muted:#6B7686;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);padding:0 0 3rem}
+  header{background:var(--navy);color:#fff;padding:1.75rem 1.5rem}
+  .inner{max-width:920px;margin:0 auto}
+  .badge{display:inline-block;background:rgba(46,139,87,.25);color:#9FE0BB;font-size:11px;font-weight:600;
+    letter-spacing:.04em;text-transform:uppercase;padding:4px 10px;border-radius:20px;margin-bottom:10px}
+  header h1{font-size:23px;font-weight:700;margin-bottom:4px}
+  header p{font-size:13px;color:#B9C4D4}
+  main{max-width:920px;margin:1.5rem auto 0;padding:0 1.5rem}
+
+  .query-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.4rem;margin-bottom:1.25rem}
+  .query-panel label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  select,input[type=text],input[type=number]{
+    font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--border);
+    border-radius:8px;background:#fff;color:var(--text);
+  }
+  select{flex:0 0 230px}
+  input[type=text]{flex:1;min-width:220px}
+  input[type=number]{width:100px;padding:8px 10px}
+  button{
+    font-family:inherit;font-size:14px;font-weight:600;background:var(--green);color:#fff;
+    border:none;border-radius:8px;padding:10px 18px;cursor:pointer;
+  }
+  button:hover{background:#256e46}
+  button.secondary{background:transparent;color:var(--navy);border:1px solid var(--border)}
+  button.secondary:hover{background:#F0F2F4}
+  .demo-row{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+  .demo-row span{font-size:12px;color:var(--text-muted);align-self:center;margin-right:4px}
+
+  #status{font-size:13px;color:var(--text-muted);margin:10px 0 0;display:none}
+  #results{margin-top:1.25rem}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:1.25rem}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.1rem}
+  .kpi .label{font-size:12px;color:var(--text-muted);margin-bottom:6px}
+  .kpi .value{font-size:24px;font-weight:700;color:var(--navy)}
+  .kpi .delta{font-size:11px;color:var(--green);margin-top:4px;font-weight:600}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.4rem;margin-bottom:1.25rem}
+  .panel h2{font-size:14px;font-weight:700;margin-bottom:14px;color:var(--navy)}
+  .bar-row{margin-bottom:12px}
+  .bar-row:last-child{margin-bottom:0}
+  .bar-label{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px}
+  .bar-label span:last-child{color:var(--text-muted)}
+  .bar-track{background:#EEF1F4;border-radius:6px;height:7px;overflow:hidden}
+  .bar-fill{background:var(--green);height:100%;border-radius:6px}
+
+  .check-list{list-style:none;display:flex;flex-direction:column;gap:11px}
+  .check-list li{display:flex;gap:9px;font-size:13.5px}
+  .check-icon{flex:0 0 18px;height:18px;border-radius:50%;background:var(--green-light);color:var(--green);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1.1rem}
+  .chip{font-size:12px;background:var(--green-light);color:#1F5C3D;padding:5px 12px;border-radius:20px;font-weight:600}
+
+  .catalog-results{max-height:260px;overflow-y:auto;margin-top:8px;border:1px solid var(--border);border-radius:8px;display:none}
+  .catalog-results.show{display:block}
+  .catalog-card{padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer}
+  .catalog-card:last-child{border-bottom:none}
+  .catalog-card:hover{background:#F6F8F9}
+  .cc-title{font-size:13.5px;font-weight:600;color:var(--navy)}
+  .cc-desc{font-size:12px;color:var(--text-muted);margin-top:2px}
+  .cc-org{font-size:11px;color:#8B95A3;margin-top:4px}
+  .muted-note{font-size:12.5px;color:var(--text-muted);padding:10px 12px}
+
+  .selected-dataset{display:none;background:var(--green-light);border:1px solid #BFE3CF;border-radius:8px;padding:10px 12px;margin-top:8px}
+  .sd-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .sd-row strong{font-size:13.5px;color:#1F5C3D}
+  .sd-id{font-size:11px;color:#3E7A5C;margin-top:2px}
+
+  .filter-control{min-width:170px}
+  .filter-control label{display:block;font-size:11.5px;color:var(--text-muted);margin-bottom:4px;font-weight:600}
+  .range-inputs{display:flex;gap:6px;align-items:center}
+  .range-inputs span{color:var(--text-muted);font-size:12px}
+  .section-divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border)}
+  th{background:var(--navy);color:#fff;font-weight:600}
+  tr:nth-child(even) td{background:#FAFBFC}
+
+  .manual-panel{display:none}
+  .manual-panel .row{margin-top:10px}
+  .manual-panel label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px}
+  input[type=file]{font-family:inherit;font-size:13px;flex:1;min-width:220px}
+  .link-btn{background:none;border:none;color:var(--green);font-size:13px;font-weight:600;cursor:pointer;padding:4px 0;text-decoration:underline}
+  .link-btn:hover{background:none;color:#1F5C3D}
+
+  .results-actions{display:none;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .infografia-status{font-size:12px;color:var(--text-muted);margin-right:auto}
+
+  .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px}
+
+  .exec-summary{background:linear-gradient(135deg,var(--navy),#163454);color:#fff;border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.25rem}
+  .exec-summary.has-image{display:flex;gap:24px;align-items:center}
+  .exec-image{width:150px;height:150px;border-radius:14px;object-fit:cover;flex-shrink:0;background:#1C3A63}
+  .exec-text{flex:1;min-width:0}
+  .hero-value{font-size:40px;font-weight:700;color:#fff;line-height:1.15}
+  .hero-label{font-size:13px;color:#B9D2E0;margin-top:2px}
+  .exec-summary .category-badge{background:var(--green);margin-left:0;margin-top:10px}
+  .exec-summary .insights-list{color:#E4EEF3;border-top:1px solid rgba(255,255,255,.15);padding-top:14px;margin-top:14px}
+  .exec-summary .insights-list li::before{color:#7FD9A8}
+  .insights-list{list-style:none;display:flex;flex-direction:column;gap:9px;font-size:13.5px}
+  .insights-list li{padding-left:18px;position:relative}
+  .insights-list li::before{content:"—";position:absolute;left:0;color:var(--green)}
+
+  .category-badge{display:inline-block;background:var(--navy);color:#fff;font-size:10.5px;font-weight:600;
+    letter-spacing:.03em;text-transform:uppercase;padding:3px 9px;border-radius:20px;vertical-align:middle;margin-left:6px}
+  .chart-box{position:relative}
+
+  .err-code{display:inline-block;background:#FBEFD9;color:#9A6A0C;font-weight:700;font-size:11.5px;padding:3px 9px;border-radius:6px;white-space:nowrap}
+  .quality-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .quality-table th{background:var(--navy);color:#fff;text-align:left;padding:10px 12px;font-weight:600}
+  .quality-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  .quality-table tr:nth-child(even) td{background:#FAFBFC}
+  .quality-table a{color:#065A82;font-weight:600}
+  .desc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+  .desc-row label{display:block;font-size:11.5px;color:var(--text-muted);margin-bottom:4px;font-weight:600}
+  .desc-row input{width:100%;font-family:inherit;font-size:12.5px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box}
+
+  footer{max-width:920px;margin:1.25rem auto 0;padding:0 1.5rem;font-size:11px;color:var(--text-muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="inner">
+    <span class="badge">Prototipo · Datos al Ecosistema 2026</span>
+    <h1>El Rosal — asistente de datos abiertos</h1>
+    <p>Elige un conjunto de datos y pregunta lo que necesites saber.</p>
+  </div>
+</header>
+
+<main>
+  <div class="query-panel">
+    <label for="datasetSearch">Buscar dataset en datos.gov.co</label>
+    <div class="row">
+      <input type="text" id="datasetSearch" placeholder="Ej: tramites, presupuesto, agua, educacion..." style="flex:1">
+    </div>
+    <div class="catalog-results" id="catalogResults"></div>
+    <button class="link-btn" id="toggleManual" type="button">¿No encuentras tu dataset? Cargar archivo o API manualmente</button>
+    <div class="manual-panel panel" id="manualPanel">
+      <h2>Cargar manualmente</h2>
+      <div class="row">
+        <div style="flex:1;min-width:220px">
+          <label for="fileInput">Archivo Excel o CSV</label>
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+        </div>
+      </div>
+      <div class="row">
+        <div style="flex:1;min-width:220px">
+          <label for="apiUrlInput">o pega la URL de una API que devuelva JSON</label>
+          <div style="display:flex;gap:10px">
+            <input type="text" id="apiUrlInput" placeholder="https://...json">
+            <button class="secondary" id="loadApiBtn" type="button">Cargar desde API</button>
+          </div>
+        </div>
+      </div>
+      <p class="muted-note" id="manualStatus" style="display:none;padding:8px 0 0"></p>
+    </div>
+    <div class="selected-dataset" id="selectedDatasetBox"></div>
+    <div id="calidadPanel" style="display:none"></div>
+    <div id="filtersPanel" class="panel" style="display:none;margin-top:1rem"></div>
+
+    <hr class="section-divider">
+    <label for="query">O pregunta en lenguaje natural (usa IA)</label>
+    <div class="row">
+      <input type="text" id="query" placeholder='Ej: "que tramites ofrece la alcaldia y cuanto cuestan"'>
+      <button id="askBtn">Consultar</button>
+    </div>
+    <div class="demo-row">
+      <span>Modo demo (sin backend conectado):</span>
+      <button class="secondary" id="demoResumen">Ver resumen ejecutivo</button>
+      <button class="secondary" id="demoTablero">Ver tablero filtrado</button>
+      <button class="secondary" id="demoImagen">Ver resumen con imagen IA</button>
+    </div>
+    <p id="status"></p>
+  </div>
+
+  <div id="results">
+    <div class="results-actions" id="resultsActions">
+      <span id="infografiaStatus" class="infografia-status" style="display:none"></span>
+      <button class="secondary" id="downloadPdfBtn" type="button">Descargar PDF</button>
+      <button id="generarInfografiaBtn" type="button">Generar infografia (con flujo IA)</button>
+      <button class="secondary" id="generarInfografiaLocalBtn" type="button">Diseño local (sin IA)</button>
+    </div>
+    <div id="resultsContent"></div>
+  </div>
+</main>
+
+<footer>
+  Fuente: catalogo de datos.gov.co y registros sectoriales de la Alcaldia de El Rosal. Prototipo desarrollado para el Concurso Datos al Ecosistema 2026: IA para Colombia.
+</footer>
+
+<script>
+/*
+  =========================================================================
+  CONFIGURACION: reemplazar por la URL publica (HTTPS) del webhook de n8n
+  =========================================================================
+*/
+const WEBHOOK_URL = "https://REEMPLAZAR-CON-TU-DOMINIO/webhook/asistente-el-rosal";
+
+const resultsEl = document.getElementById("resultsContent");
+const resultsActionsEl = document.getElementById("resultsActions");
+const statusEl = document.getElementById("status");
+const datasetSearchEl = document.getElementById("datasetSearch");
+const catalogResultsEl = document.getElementById("catalogResults");
+const selectedBox = document.getElementById("selectedDatasetBox");
+const manualStatusEl = document.getElementById("manualStatus");
+let selectedDataset = null;
+let searchTimer = null;
+let loadedRows = [];
+let columnDefs = [];
+let columnDescriptions = {};
+let datasetMeta = { titulo: "", descripcion: "" };
+
+document.getElementById("toggleManual").addEventListener("click", () => {
+  const p = document.getElementById("manualPanel");
+  p.style.display = p.style.display === "block" ? "none" : "block";
+});
+
+document.getElementById("fileInput").addEventListener("change", handleFileUpload);
+document.getElementById("loadApiBtn").addEventListener("click", handleApiUrlLoad);
+document.getElementById("downloadPdfBtn").addEventListener("click", downloadPDF);
+document.getElementById("generarInfografiaBtn").addEventListener("click", generarInfografiaPDF);
+document.getElementById("generarInfografiaLocalBtn").addEventListener("click", generarInfografiaSoloLocal);
+
+async function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  manualStatusEl.style.display = "block";
+  manualStatusEl.textContent = "Leyendo " + file.name + "...";
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: "array", cellDates: true });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (!rows.length) { manualStatusEl.textContent = "El archivo no tiene filas de datos."; return; }
+    activateManualDataset(file.name, rows, "Archivo cargado manualmente");
+    manualStatusEl.textContent = "Se cargaron " + rows.length + " filas de \"" + file.name + "\".";
+  } catch (err) {
+    manualStatusEl.textContent = "No se pudo leer el archivo. Verifica que sea un Excel (.xlsx/.xls) o CSV valido.";
+  }
+}
+
+async function handleApiUrlLoad() {
+  const url = document.getElementById("apiUrlInput").value.trim();
+  if (!url) { alert("Pega la URL de la API que quieres consultar."); return; }
+  manualStatusEl.style.display = "block";
+  manualStatusEl.textContent = "Consultando API...";
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("respuesta no valida");
+    const json = await res.json();
+    const rows = Array.isArray(json) ? json : (json.data || json.results || json.records || json.rows || []);
+    if (!rows.length) { manualStatusEl.textContent = "La API respondio, pero no se encontro un arreglo de datos reconocible (se esperaba un arreglo JSON o una llave data/results/records/rows)."; return; }
+    activateManualDataset(url, rows, "API cargada manualmente");
+    manualStatusEl.textContent = "Se cargaron " + rows.length + " registros desde la API.";
+  } catch (err) {
+    manualStatusEl.textContent = "No se pudo cargar esa API. Verifica la URL y que el servicio permita llamadas desde el navegador (CORS).";
+  }
+}
+
+function activateManualDataset(name, rows, sourceLabel) {
+  selectedDataset = { id: "manual", name };
+  loadedRows = cleanRows(rows);
+  columnDefs = buildColumnDefs(loadedRows);
+  columnDescriptions = {};
+  document.getElementById("manualPanel").style.display = "none";
+  selectedBox.style.display = "block";
+  selectedBox.innerHTML = `
+    <div class="sd-row">
+      <div><strong>${escapeHtml(name)}</strong><div class="sd-id">${escapeHtml(sourceLabel)}</div></div>
+      <button class="secondary" id="clearDataset" type="button">Cambiar</button>
+    </div>
+    <button class="secondary" id="verificarCalidadBtn" type="button" style="margin-top:10px">Verificar antes de publicar en datos.gov.co</button>`;
+  document.getElementById("clearDataset").addEventListener("click", clearSelectedDataset);
+  document.getElementById("verificarCalidadBtn").addEventListener("click", verificarCalidadDatos);
+  applyFiltersAndRender();
+}
+
+function clearSelectedDataset() {
+  selectedDataset = null;
+  loadedRows = [];
+  columnDefs = [];
+  columnDescriptions = {};
+  datasetMeta = { titulo: "", descripcion: "" };
+  selectedBox.style.display = "none";
+  selectedBox.innerHTML = "";
+  document.getElementById("filtersPanel").style.display = "none";
+  const calidadPanel = document.getElementById("calidadPanel");
+  if (calidadPanel) { calidadPanel.style.display = "none"; calidadPanel.innerHTML = ""; }
+}
+
+datasetSearchEl.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  const term = datasetSearchEl.value.trim();
+  if (term.length < 3) { catalogResultsEl.classList.remove("show"); catalogResultsEl.innerHTML = ""; return; }
+  searchTimer = setTimeout(() => searchCatalog(term), 400);
+});
+
+async function searchCatalog(term) {
+  catalogResultsEl.classList.add("show");
+  catalogResultsEl.innerHTML = `<p class="muted-note">Buscando en datos.gov.co...</p>`;
+  try {
+    const url = "https://api.us.socrata.com/api/catalog/v1?domains=datos.gov.co&search_context=datos.gov.co&only=datasets&q="
+      + encodeURIComponent(term) + "&limit=8";
+    const res = await fetch(url);
+    const data = await res.json();
+    renderCatalogResults(data.results || []);
+  } catch (err) {
+    catalogResultsEl.innerHTML = `<p class="muted-note">No se pudo buscar en datos.gov.co en este momento. Intenta de nuevo.</p>`;
+  }
+}
+
+function renderCatalogResults(results) {
+  if (!results.length) {
+    catalogResultsEl.innerHTML = `<p class="muted-note">Sin resultados. Prueba con otra palabra clave.</p>`;
+    return;
+  }
+  catalogResultsEl.innerHTML = results.map(r => {
+    const res = r.resource;
+    const org = (r.classification && r.classification.domain_category) || "datos.gov.co";
+    const updated = res.updatedAt ? new Date(res.updatedAt).toLocaleDateString("es-CO") : "fecha no disponible";
+    const cols = (res.columns_name || []).slice(0, 8);
+    return `<div class="catalog-card" data-id="${res.id}" data-name="${escapeAttr(res.name)}" data-cols='${escapeAttr(JSON.stringify(cols))}'>
+      <p class="cc-title">${escapeHtml(res.name)}</p>
+      <p class="cc-desc">${escapeHtml((res.description || "Sin descripcion disponible.").slice(0, 140))}</p>
+      <p class="cc-org">${escapeHtml(org)} &middot; actualizado ${updated}</p>
+    </div>`;
+  }).join("");
+
+  catalogResultsEl.querySelectorAll(".catalog-card").forEach(card => {
+    card.addEventListener("click", () => {
+      selectDataset(card.dataset.id, card.dataset.name, JSON.parse(card.dataset.cols));
+    });
+  });
+}
+
+function selectDataset(id, name, columns) {
+  selectedDataset = { id, name };
+  loadedRows = [];
+  columnDefs = [];
+  columnDescriptions = {};
+  document.getElementById("filtersPanel").style.display = "none";
+  catalogResultsEl.classList.remove("show");
+  catalogResultsEl.innerHTML = "";
+  datasetSearchEl.value = "";
+  selectedBox.style.display = "block";
+  const colsHtml = columns.length
+    ? `<div class="chips" style="margin:8px 0 0">${columns.map(c => `<span class="chip">${escapeHtml(c)}</span>`).join("")}</div>`
+    : "";
+  selectedBox.innerHTML = `
+    <div class="sd-row">
+      <div><strong>${escapeHtml(name)}</strong><div class="sd-id">ID en datos.gov.co: ${id}</div></div>
+      <button class="secondary" id="clearDataset" type="button">Cambiar</button>
+    </div>
+    ${colsHtml}
+    <p class="muted-note" id="loadStatus" style="padding:8px 0 0">Cargando y totalizando datos...</p>
+    <button class="secondary" id="verificarCalidadBtn" type="button" style="margin-top:10px">Verificar antes de publicar en datos.gov.co</button>
+  `;
+  document.getElementById("clearDataset").addEventListener("click", clearSelectedDataset);
+  document.getElementById("verificarCalidadBtn").addEventListener("click", verificarCalidadDatos);
+  loadDatasetRows();
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function escapeAttr(str) {
+  return String(str).replace(/"/g, "&quot;");
+}
+
+document.getElementById("askBtn").addEventListener("click", () => {
+  const query = document.getElementById("query").value.trim();
+  if (!query) { alert("Escribe que quieres consultar."); return; }
+  if (!selectedDataset) { alert("Primero busca y selecciona un dataset de datos.gov.co."); return; }
+  consultar(query, selectedDataset);
+});
+
+document.getElementById("demoResumen").addEventListener("click", () => render(demoResumenData()));
+document.getElementById("demoTablero").addEventListener("click", () => render(demoTableroData()));
+document.getElementById("demoImagen").addEventListener("click", () => render(demoImagenData()));
+
+/*
+  =========================================================================
+  CARGA DE DATOS + GENERACION AUTOMATICA DE FILTROS (100% en el navegador)
+  =========================================================================
+  Esto NO pasa por n8n. Llama directo al endpoint publico de Socrata para
+  el dataset seleccionado, infiere el tipo de cada columna a partir de los
+  datos reales, y arma controles de filtro automaticamente. Util para
+  exploracion estructurada rapida; la caja de "pregunta en lenguaje
+  natural" de mas abajo sigue siendo el camino para consultas que requieren
+  IA (interpretar texto libre, combinar datasets, redactar resumenes).
+*/
+async function loadDatasetRows() {
+  if (!selectedDataset) return;
+  const loadStatus = document.getElementById("loadStatus");
+  const filtersPanel = document.getElementById("filtersPanel");
+  loadStatus.style.display = "block";
+  loadStatus.textContent = "Cargando datos de " + selectedDataset.name + "...";
+  filtersPanel.style.display = "none";
+  resultsEl.innerHTML = "";
+  try {
+    const url = "https://www.datos.gov.co/resource/" + selectedDataset.id + ".json?$limit=1000";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("error al cargar datos");
+    const rows = await res.json();
+    if (!rows.length) { loadStatus.textContent = "Este dataset no devolvio registros."; return; }
+    loadedRows = cleanRows(rows);
+    columnDefs = buildColumnDefs(loadedRows);
+    applyFiltersAndRender();
+    loadStatus.textContent = "Se cargaron " + loadedRows.length + " registros. Este es el panorama totalizado del dataset.";
+  } catch (err) {
+    loadStatus.textContent = "No se pudieron cargar los datos de este dataset (puede que no tenga API publica habilitada).";
+  }
+}
+
+/*
+  =========================================================================
+  VERIFICADOR DE CALIDAD ANTES DE PUBLICAR EN DATOS.GOV.CO
+  =========================================================================
+  Replica en el cliente, de forma instantanea, el listado OFICIAL y
+  COMPLETO de errores frecuentes que usa el equipo de Calidad de
+  datos.gov.co (ERR001 a ERR022), consultado directamente de su propio
+  dataset publico: https://www.datos.gov.co/resource/xbc7-65j4 -- no es
+  una lista inventada ni parcial.
+
+  De los 22 codigos oficiales, 13 se pueden verificar automaticamente
+  solo con el archivo de datos (mas titulo/descripcion opcional). Los que
+  no se incluyen (ERR003, ERR010, ERR012, ERR013, ERR014, ERR015, ERR017,
+  ERR021, ERR022) requieren contexto que no existe en un archivo aislado
+  -- por ejemplo comparar contra otros datasets ya publicados, o el
+  nombre del usuario de la cuenta -- y se documentan igual abajo para que
+  se revisen manualmente.
+
+  No reemplaza la revision oficial de datos.gov.co, pero detecta de
+  entrada los problemas mas frecuentes en vez de esperar 3 a 5 dias.
+*/
+const QUALITY_LINKS = {
+  ERR001: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR002: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR004: "https://herramientas.datos.gov.co/es/content/publicar-conjuntos-de-datos",
+  ERR005: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR006: "https://www.datos.gov.co/stories/s/Conjuntos-de-Datos-Obligatorios-Ley-1712-de-2014/724h-3u74",
+  ERR007: "https://www.datos.gov.co/stories/s/rkeb-yz5f",
+  ERR008: "https://www.datos.gov.co/stories/s/rkeb-yz5f",
+  ERR008_1: "https://drive.google.com/file/d/1H3w0p_qXm_NZAw-YVZUUK-GG8BIV1EYA/view",
+  ERR008_2: "https://drive.google.com/file/d/1H3w0p_qXm_NZAw-YVZUUK-GG8BIV1EYA/view",
+  ERR008_3: "https://drive.google.com/file/d/1H3w0p_qXm_NZAw-YVZUUK-GG8BIV1EYA/view",
+  ERR009: "https://support.socrata.com/hc/en-us/sections/360000042208-Maps",
+  ERR011: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR016: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR018: "https://www.archivogeneral.gov.co/sites/default/files/Estructura_Web/5_Consulte/Recursos/Publicacionees/Guia_de_Anonimizacion-min.pdf",
+  ERR019: "https://herramientas.datos.gov.co/es/content/publicar-conjuntos-de-datos",
+  ERR020: "https://herramientas.datos.gov.co/es/content/publicar-conjuntos-de-datos",
+};
+
+// Codigos que requieren contexto externo (otros datasets, cuenta de
+// usuario, historial de actualizaciones) y NO se pueden verificar solo
+// con el archivo. Se muestran como recordatorio manual, sin marcarlos
+// como error detectado.
+const MANUAL_CHECK_CODES = [
+  { codigo: "ERR003", nota: "El nombre de usuario de la cuenta no debe ser el de una persona, sino el de la entidad." },
+  { codigo: "ERR010", nota: "Si vas a publicar por enlace (no por archivo), el enlace debe apuntar a CSV/XLS/XLSX/JSON/KML/KMZ/ZIP, nunca a PDF/imagen/Word." },
+  { codigo: "ERR012", nota: "Verifica que este conjunto no sea un duplicado de uno ya publicado por una entidad nacional." },
+  { codigo: "ERR014", nota: "El dataset debe actualizarse segun la frecuencia que declares en la metadata (ej. mensual, anual)." },
+  { codigo: "ERR015", nota: "Si tienes varios archivos con exactamente las mismas columnas, conviene unirlos en un solo dataset." },
+];
+
+function verificarCalidadDatos() {
+  if (!loadedRows.length) { alert("Primero carga un dataset (Buscar dataset o Cargar archivo/API)."); return; }
+  const fields = Object.keys(loadedRows[0]).filter(f => !f.startsWith(":"));
+  const total = loadedRows.length;
+  const issues = [];
+
+  // ---- ERR004: sin filas ----
+  if (total === 0) {
+    issues.push({ codigo: "ERR004", descripcion: "El conjunto de datos no tiene ningun registro con informacion.",
+      solucion: "Elimina este conjunto y publica uno nuevo con columnas y registros reales.", link: QUALITY_LINKS.ERR004 });
+  }
+
+  // ---- ERR005: menos de 50 registros ----
+  if (total > 0 && total < 50) {
+    issues.push({ codigo: "ERR005", descripcion: "El conjunto tiene " + total + " registros. Con menos de 50, se limita su utilidad para ciudadanos, empresas o investigadores (esta regla no aplica si el dato es obligatorio por ley).",
+      solucion: "Amplia el numero de registros: agrega informacion historica, mas columnas, o consolida con datos de fuentes relacionadas.", link: QUALITY_LINKS.ERR005 });
+  }
+
+  // ---- ERR008 / ERR008_1: muy pocas columnas ----
+  if (fields.length === 1) {
+    issues.push({ codigo: "ERR008", descripcion: "El conjunto de datos solo tiene una columna, insuficiente para analisis.",
+      solucion: "Publica un dataset nuevo con mas columnas y registros.", link: QUALITY_LINKS.ERR008 });
+  } else if (fields.length < 5) {
+    issues.push({ codigo: "ERR008_1", descripcion: "El conjunto tiene " + fields.length + " columnas. Con menos de 5 se limitan las posibilidades de analisis.",
+      solucion: "Enriquece el conjunto agregando mas columnas con informacion relevante.", link: QUALITY_LINKS.ERR008_1 });
+  }
+
+  // ---- ERR008_2: columnas sin nombre o con nombre generico ----
+  const unnamedCols = fields.filter(f => /^(unnamed|column\d*|__empty|f\d+|campo\d*)$/i.test(f.trim()) || !f.trim());
+  if (unnamedCols.length) {
+    issues.push({ codigo: "ERR008_2", descripcion: "Columnas sin nombre claro (aparecen como '" + unnamedCols[0] + "' o similar): " + unnamedCols.length + " columna(s).",
+      solucion: "Asigna un nombre claro a cada columna antes de publicar.", link: QUALITY_LINKS.ERR008_2 });
+  }
+
+  // ---- ERR007: celdas vacias ----
+  const emptyCols = [];
+  fields.forEach(f => {
+    const empty = loadedRows.filter(r => r[f] === undefined || r[f] === null || String(r[f]).trim() === "").length;
+    const pct = empty / total;
+    if (pct > 0.05) emptyCols.push({ field: f, pct });
+  });
+  if (emptyCols.length) {
+    issues.push({ codigo: "ERR007", descripcion: "Celdas vacias o sin informacion en: " + emptyCols
+      .sort((a, b) => b.pct - a.pct).slice(0, 6)
+      .map(c => humanizeField(c.field) + " (" + Math.round(c.pct * 100) + "% vacio)").join(", ")
+      + (emptyCols.length > 6 ? " y " + (emptyCols.length - 6) + " mas" : "") + ".",
+      solucion: "Revisa y completa los campos vacios. Se puede usar OpenRefine u otra herramienta de calidad de datos.", link: QUALITY_LINKS.ERR007 });
+  }
+
+  // ---- ERR009: hay direccion pero no lat/lon ----
+  const tieneDireccion = fields.some(f => /direcci[oó]n|address/i.test(f));
+  const tieneCoords = fields.some(f => /latitud|longitud|\blat\b|\blon\b|\blng\b|coordenada/i.test(f));
+  if (tieneDireccion && !tieneCoords) {
+    issues.push({ codigo: "ERR009", descripcion: "Se encontro una columna de direccion pero no columnas de latitud/longitud.",
+      solucion: "Agrega columnas de latitud y longitud para permitir visualizacion en mapas.", link: QUALITY_LINKS.ERR009 });
+  }
+
+  // ---- ERR011: sin columna de fecha/vigencia/periodo ----
+  const tieneFecha = columnDefs.some(d => d.kind === "date") || fields.some(f => /fecha|a[nñ]o|vigencia|periodo/i.test(f));
+  if (!tieneFecha) {
+    issues.push({ codigo: "ERR011", descripcion: "No se identifico una columna de fecha, año o vigencia. Si este dataset se vuelve a publicar cada año o periodo por separado, datos.gov.co pide consolidarlos en un unico conjunto.",
+      solucion: "Agrega una columna de fecha o vigencia (ej. DD/MM/AAAA) y consolida los datos historicos en un solo archivo que se actualice.", link: QUALITY_LINKS.ERR011 });
+  }
+
+  // ---- ERR016: el archivo traia filas de totales/resumen (se detectaron y limpiaron) ----
+  if (removedSummaryRowsCount > 0) {
+    issues.push({ codigo: "ERR016", descripcion: "Se detectaron " + removedSummaryRowsCount + " fila(s) que parecen totales o resumenes (casi todas las columnas vacias salvo una), en vez de registros de detalle.",
+      solucion: "Los datos abiertos deben publicarse en su maximo nivel de detalle. Elimina las filas de 'TOTAL' o notas de fuente antes de publicar; si necesitas mostrar resumenes, usa la funcionalidad de 'vistas' del portal sin alterar el archivo original.", link: QUALITY_LINKS.ERR016 });
+  }
+
+  // ---- ERR018: posibles datos personales o sensibles ----
+  const sensiblePatterns = /nombre|apellido|c[eé]dula|documento|identificaci[oó]n|\bnit\b|tel[eé]fono|celular|correo|email|direcci[oó]n/i;
+  const idLikeName = /^(no\.?[_ ]?|num(ero)?[_ ]?|id[_ ]?|consecutivo|codigo|estrato)/i;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const cedulaRegex = /^\d{7,10}$/;
+  const flaggedFields = [];
+  fields.forEach(f => {
+    if (sensiblePatterns.test(f)) { flaggedFields.push(humanizeField(f) + " (nombre de columna sugiere dato personal)"); return; }
+    const sample = loadedRows.slice(0, 60).map(r => r[f]).filter(v => v !== undefined && v !== null && v !== "" && typeof v !== "object");
+    if (!sample.length) return;
+    const emailShare = sample.filter(v => emailRegex.test(String(v))).length / sample.length;
+    if (emailShare > 0.4) { flaggedFields.push(humanizeField(f) + " (contiene correos electronicos)"); return; }
+    if (!idLikeName.test(f)) {
+      const cedulaShare = sample.filter(v => cedulaRegex.test(String(v).trim())).length / sample.length;
+      if (cedulaShare > 0.6) flaggedFields.push(humanizeField(f) + " (parece contener numeros de documento de identidad)");
+    }
+  });
+  if (flaggedFields.length) {
+    issues.push({ codigo: "ERR018", descripcion: "Posibles datos personales o sensibles en: " + flaggedFields.join(", ") + ". Publicar esta informacion sin anonimizar puede comprometer la privacidad de las personas (Ley 1581 de 2012).",
+      solucion: "Elimina estas columnas del conjunto a publicar, o aplica tecnicas de anonimizacion antes de subirlo.", link: QUALITY_LINKS.ERR018 });
+  }
+
+  // ---- ERR019: tipos de datos inconsistentes dentro de una misma columna ----
+  const tipoInconsistente = [];
+  fields.forEach(f => {
+    const sample = loadedRows.map(r => r[f]).filter(v => v !== undefined && v !== null && v !== "" && typeof v !== "object");
+    if (sample.length < 10) return;
+    const numericCount = sample.filter(v => v !== "" && !isNaN(Number(v))).length;
+    const numericShare = numericCount / sample.length;
+    // "Mayormente numerico" pero con un grupo significativo de valores no numericos = mezcla de tipos
+    if (numericShare > 0.6 && numericShare < 0.95) tipoInconsistente.push(humanizeField(f));
+  });
+  if (tipoInconsistente.length) {
+    issues.push({ codigo: "ERR019", descripcion: "Las columnas " + tipoInconsistente.slice(0, 5).join(", ") + " mezclan valores numericos y de texto, lo que sugiere un tipo de dato inconsistente.",
+      solucion: "Revisa que cada columna tenga un unico tipo de dato consistente en todas las filas (todo numero, todo texto o todo fecha).", link: QUALITY_LINKS.ERR019 });
+  }
+
+  // ---- ERR020: filas duplicadas ----
+  const seen = new Set();
+  let duplicateCount = 0;
+  loadedRows.forEach(r => {
+    const key = JSON.stringify(fields.map(f => r[f]));
+    if (seen.has(key)) duplicateCount++; else seen.add(key);
+  });
+  if (duplicateCount > 0) {
+    issues.push({ codigo: "ERR020", descripcion: "Se encontraron " + duplicateCount + " fila(s) duplicada(s) (con la misma informacion en todas las columnas).",
+      solucion: "Revisa y elimina los registros duplicados. Se puede usar Open Refine para identificarlos facilmente.", link: QUALITY_LINKS.ERR020 });
+  }
+
+  // ---- ERR001/ERR002/ERR006: solo si se diligencio titulo/descripcion del dataset ----
+  if (datasetMeta.titulo && datasetMeta.titulo.trim()) {
+    const t = datasetMeta.titulo.trim();
+    const problemasTitulo = [];
+    if (/\b(19|20)\d{2}\b/.test(t)) problemasTitulo.push("no debe incluir el año o vigencia en el titulo");
+    if (t.length < 10) problemasTitulo.push("es demasiado corto/generico");
+    if (/[^\w\sÁÉÍÓÚáéíóúÑñ.,()-]/.test(t)) problemasTitulo.push("contiene caracteres especiales");
+    if (problemasTitulo.length) {
+      issues.push({ codigo: "ERR001", descripcion: "El titulo propuesto (\"" + t + "\") " + problemasTitulo.join(" y ") + ".",
+        solucion: "Actualiza el titulo siguiendo las recomendaciones de calidad: claro, general, sin siglas ni vigencias.", link: QUALITY_LINKS.ERR001 });
+    }
+    const mandatoryNames = /registro de activos de informaci[oó]n|indice de informaci[oó]n clasificada|esquema de publicaci[oó]n|tabla.*retenci[oó]n documental/i;
+    if (mandatoryNames.test(t)) {
+      issues.push({ codigo: "ERR006", descripcion: "El titulo sugiere que este es uno de los conjuntos obligatorios por Ley 1712/2014 (Registro de Activos, Indice de Informacion Clasificada, Esquema de Publicacion o Tablas de Retencion) que ya NO deben publicarse por separado.",
+        solucion: "Consolida este dato con el esquema de federacion por URL desde la seccion de Transparencia del sitio institucional, en vez de subirlo como dataset independiente.", link: QUALITY_LINKS.ERR006 });
+    }
+  }
+  if (!datasetMeta.descripcion || !datasetMeta.descripcion.trim()) {
+    issues.push({ codigo: "ERR002", descripcion: "No se ha diligenciado una descripcion general del conjunto de datos (campo debajo de este reporte).",
+      solucion: "Completa la descripcion general del dataset explicando que contiene y para que sirve.", link: QUALITY_LINKS.ERR002 });
+  }
+
+  // ---- ERR008_3: columnas sin descripcion ----
+  const sinDescripcion = fields.filter(f => !(columnDescriptions[f] && columnDescriptions[f].trim()));
+  if (sinDescripcion.length) {
+    issues.push({ codigo: "ERR008_3", descripcion: sinDescripcion.length + " de " + fields.length + " columnas no tienen descripcion: "
+      + sinDescripcion.slice(0, 6).map(humanizeField).join(", ") + (sinDescripcion.length > 6 ? "..." : "") + ".",
+      solucion: "Agrega una descripcion clara a cada columna (formulario abajo) antes de subir la metadata a datos.gov.co.", link: QUALITY_LINKS.ERR008_3 });
+  }
+
+  renderCalidadReport(issues, fields);
+}
+
+function renderCalidadReport(issues, fields) {
+  const panel = document.getElementById("calidadPanel");
+  panel.style.display = "block";
+  const verdictOk = issues.length === 0;
+
+  const rowsHtml = issues.map(i => `
+    <tr>
+      <td>${escapeHtml(selectedDataset.name)}</td>
+      <td><span class="err-code">${i.codigo}</span></td>
+      <td>${escapeHtml(i.descripcion)}</td>
+      <td>${escapeHtml(i.solucion)}</td>
+      <td><a href="${i.link}" target="_blank" rel="noopener">Ver guia</a></td>
+    </tr>`).join("");
+
+  const manualHtml = MANUAL_CHECK_CODES.map(m => `<li><span class="err-code" style="background:#EAF3F7;color:#065A82">${m.codigo}</span> ${escapeHtml(m.nota)}</li>`).join("");
+
+  const descFormHtml = fields.map(f => `
+    <div class="desc-row">
+      <label>${escapeHtml(humanizeField(f))}</label>
+      <input type="text" data-field="${escapeAttr(f)}" class="desc-input" placeholder="Que representa esta columna..." value="${escapeAttr(columnDescriptions[f] || "")}">
+    </div>`).join("");
+
+  panel.innerHTML = `
+    <div class="panel" style="margin-top:1rem;border-left:4px solid ${verdictOk ? "#2E8B57" : "#C97B0C"}">
+      <h2>${verdictOk ? "✓ No se detectaron errores automatizables" : "⚠ " + issues.length + " posible(s) problema(s) detectado(s)"}</h2>
+      <p class="muted-note" style="padding:0 0 12px">Verificacion instantanea basada en el listado OFICIAL y completo de errores de calidad de datos.gov.co (ERR001-ERR022, consultado de su propio dataset publico). Cubre 13 de los 22 codigos -- los que se pueden revisar solo con el archivo. No reemplaza la revision oficial.</p>
+
+      <div style="margin-bottom:18px">
+        <div class="row" style="gap:10px">
+          <div style="flex:1;min-width:200px">
+            <label style="display:block;font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:4px">Titulo propuesto del dataset (opcional, para ERR001/ERR006)</label>
+            <input type="text" id="metaTituloInput" value="${escapeAttr(datasetMeta.titulo)}" placeholder="Ej: Tramites y servicios de la Alcaldia" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:12.5px">
+          </div>
+          <div style="flex:1;min-width:200px">
+            <label style="display:block;font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:4px">Descripcion general (opcional, para ERR002)</label>
+            <input type="text" id="metaDescripcionInput" value="${escapeAttr(datasetMeta.descripcion)}" placeholder="De que trata este conjunto de datos..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:12.5px">
+          </div>
+        </div>
+      </div>
+
+      ${issues.length ? `
+        <div style="overflow-x:auto">
+          <table class="quality-table">
+            <thead><tr><th>Conjunto de datos</th><th>Codigo</th><th>Descripcion del error</th><th>Solucion recomendada</th><th>Guia</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>` : ""}
+
+      <div style="margin-top:20px">
+        <p style="font-size:12.5px;font-weight:600;margin-bottom:8px;color:var(--text)">Otros codigos que requieren revision manual (no verificables solo con el archivo)</p>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-muted)">${manualHtml}</ul>
+      </div>
+
+      <div style="margin-top:22px">
+        <p style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text)">Descripciones de columnas (evita ERR008_3)</p>
+        <div class="desc-grid">${descFormHtml}</div>
+        <button class="secondary" id="guardarDescripcionesBtn" type="button" style="margin-top:14px">Guardar y volver a verificar</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("guardarDescripcionesBtn").addEventListener("click", () => {
+    document.querySelectorAll(".desc-input").forEach(inp => { columnDescriptions[inp.dataset.field] = inp.value; });
+    datasetMeta.titulo = document.getElementById("metaTituloInput").value;
+    datasetMeta.descripcion = document.getElementById("metaDescripcionInput").value;
+    verificarCalidadDatos();
+  });
+}
+
+
+let removedSummaryRowsCount = 0;
+
+function cleanRows(rows) {
+  if (!rows.length) return rows;
+  const fieldCount = Object.keys(rows[0]).length;
+  // Descarta filas casi vacias (totales, notas de fuente/licencia al final del archivo, etc.)
+  const cleaned = rows.filter(r => {
+    const filled = Object.values(r).filter(v => v !== undefined && v !== null && v !== "").length;
+    return filled >= fieldCount * 0.4;
+  });
+  removedSummaryRowsCount = rows.length - cleaned.length;
+  return cleaned;
+}
+
+function buildColumnDefs(rows) {
+  const fields = Object.keys(rows[0]).filter(f => !f.startsWith(":"));
+  const defs = [];
+  fields.forEach(field => {
+    const values = rows.map(r => r[field]).filter(v =>
+      v !== undefined && v !== null && v !== "" && (typeof v !== "object" || v instanceof Date)
+    );
+    if (values.length < rows.length * 0.5) return;
+
+    const isIdLike = /^(no\.?[_ ]?|num(ero)?[_ ]?|id[_ ]?|consecutivo)/i.test(field);
+    const distinctRaw = new Set(values.map(String));
+
+    // Fechas reales (objetos Date de Excel) o strings ISO tipo "2018-01-01..."
+    const looksLikeDate = v => v instanceof Date || (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v));
+    if (values.filter(looksLikeDate).length >= values.length * 0.9) {
+      const dateValues = values.map(v => v instanceof Date ? v : new Date(v)).filter(d => !isNaN(d.getTime()));
+      const years = Array.from(new Set(dateValues.map(d => d.getUTCFullYear()))).sort();
+      if (years.length >= 2) defs.push({ field, kind: "date", years });
+      return;
+    }
+
+    const allNumeric = values.every(v => v !== "" && !isNaN(Number(v)));
+    if (allNumeric) {
+      const nums = values.map(Number);
+      const allUnique = distinctRaw.size === values.length;
+      const noVariance = distinctRaw.size === 1;
+      if (isIdLike || noVariance || (allUnique && values.length > 15)) return; // identificador o columna constante: no sirve como filtro
+      defs.push({ field, kind: "numeric", min: Math.min(...nums), max: Math.max(...nums) });
+      return;
+    }
+
+    const distinct = Array.from(distinctRaw);
+    const avgLen = values.reduce((a, v) => a + String(v).length, 0) / values.length;
+    const mostlyUnique = distinct.length > values.length * 0.6;
+    if (distinct.length >= 2 && !mostlyUnique && avgLen < 60) {
+      defs.push({ field, kind: "categorical", values: distinct.sort() });
+    }
+  });
+  const order = { categorical: 0, date: 1, numeric: 2 };
+  defs.sort((a, b) => order[a.kind] - order[b.kind]);
+  return defs.slice(0, 16);
+}
+
+function humanizeField(field) {
+  return field.replace(/_/g, " ").split(" ")
+    .map(w => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w)
+    .join(" ");
+}
+function formatNum(n) { return Number(n).toLocaleString("es-CO"); }
+
+function renderFilters(defs) {
+  const panel = document.getElementById("filtersPanel");
+  panel.style.display = "block";
+  if (!defs.length) {
+    panel.innerHTML = `<h2>Filtros</h2>
+      <p class="muted-note" style="padding:0 0 10px">No se detectaron columnas claras para filtrar; se mostraran los datos sin filtro.</p>
+      <button id="graphBtn">Actualizar</button>`;
+  } else {
+    panel.innerHTML = `<h2>Filtros generados desde las columnas del dataset</h2>
+      <div class="row" id="filterControls">${defs.map(renderFilterControl).join("")}</div>
+      <button id="graphBtn" style="margin-top:14px">Actualizar</button>`;
+  }
+  document.getElementById("graphBtn").addEventListener("click", applyFiltersAndRender);
+}
+
+function renderFilterControl(d) {
+  const label = humanizeField(d.field);
+  if (d.kind === "categorical") {
+    return `<div class="filter-control">
+      <label>${escapeHtml(label)}</label>
+      <select data-field="${d.field}" data-kind="categorical">
+        <option value="">Todos</option>
+        ${d.values.map(v => `<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join("")}
+      </select>
+    </div>`;
+  }
+  if (d.kind === "date") {
+    return `<div class="filter-control">
+      <label>${escapeHtml(label)} (año)</label>
+      <select data-field="${d.field}" data-kind="year">
+        <option value="">Todos</option>
+        ${d.years.map(y => `<option value="${y}">${y}</option>`).join("")}
+      </select>
+    </div>`;
+  }
+  return `<div class="filter-control">
+    <label>${escapeHtml(label)} (${formatNum(d.min)} a ${formatNum(d.max)})</label>
+    <div class="range-inputs">
+      <input type="number" data-field="${d.field}" data-kind="min" placeholder="min">
+      <span>a</span>
+      <input type="number" data-field="${d.field}" data-kind="max" placeholder="max">
+    </div>
+  </div>`;
+}
+
+function applyFiltersAndRender() {
+  const controls = document.querySelectorAll("#filterControls [data-field]");
+  const byField = {};
+  controls.forEach(c => {
+    byField[c.dataset.field] = byField[c.dataset.field] || {};
+    if (c.dataset.kind === "categorical") byField[c.dataset.field].value = c.value;
+    if (c.dataset.kind === "year") byField[c.dataset.field].year = c.value;
+    if (c.dataset.kind === "min") byField[c.dataset.field].min = c.value;
+    if (c.dataset.kind === "max") byField[c.dataset.field].max = c.value;
+  });
+
+  let filtered = loadedRows.slice();
+  const activeFilters = [];
+  Object.entries(byField).forEach(([field, f]) => {
+    if (f.value) {
+      filtered = filtered.filter(r => String(r[field]) === f.value);
+      activeFilters.push({ label: humanizeField(field), value: f.value });
+    }
+    if (f.year) {
+      filtered = filtered.filter(r => {
+        const d = r[field] instanceof Date ? r[field] : new Date(r[field]);
+        return !isNaN(d.getTime()) && String(d.getUTCFullYear()) === f.year;
+      });
+      activeFilters.push({ label: humanizeField(field) + " (año)", value: f.year });
+    }
+    if (f.min !== undefined && f.min !== "") {
+      filtered = filtered.filter(r => Number(r[field]) >= Number(f.min));
+      activeFilters.push({ label: humanizeField(field) + " min", value: f.min });
+    }
+    if (f.max !== undefined && f.max !== "") {
+      filtered = filtered.filter(r => Number(r[field]) <= Number(f.max));
+      activeFilters.push({ label: humanizeField(field) + " max", value: f.max });
+    }
+  });
+
+  const categoricalDef = columnDefs.find(d => d.kind === "categorical");
+  const categoricalDefs = columnDefs.filter(d => d.kind === "categorical");
+  const numericDefs = columnDefs.filter(d => d.kind === "numeric");
+  const numericDef = numericDefs[0];
+  const dateDef = columnDefs.find(d => d.kind === "date");
+  const labelField = (categoricalDef && categoricalDef.field) || (columnDefs[0] && columnDefs[0].field) || Object.keys(loadedRows[0])[0];
+
+  const displayFields = [];
+  if (labelField) displayFields.push(labelField);
+  if (numericDef && numericDef.field !== labelField) displayFields.push(numericDef.field);
+  columnDefs.forEach(d => { if (!displayFields.includes(d.field) && displayFields.length < 6) displayFields.push(d.field); });
+
+  const insights = [];
+  insights.push("Se analizaron " + filtered.length.toLocaleString("es-CO") + " registros" + (activeFilters.length ? ", con los filtros aplicados" : " en total") + ".");
+
+  // Tarjetas de estadisticas: total + comparativo por periodo + primera columna numerica
+  const stats = [{ label: "Total de registros", value: filtered.length.toLocaleString("es-CO") }];
+  if (numericDef) {
+    const nums = filtered.map(r => Number(r[numericDef.field])).filter(n => !isNaN(n));
+    const isRateLike = /edad|age|porcentaje|percent|tasa|rate|promedio|indice|índice/i.test(numericDef.field);
+    if (nums.length) {
+      const sum = nums.reduce((a, b) => a + b, 0);
+      const avg = sum / nums.length;
+      if (!isRateLike) stats.push({ label: "Suma de " + humanizeField(numericDef.field), value: formatNum(Math.round(sum)) });
+      stats.push({ label: "Promedio de " + humanizeField(numericDef.field), value: formatNum(Math.round(avg)) });
+      stats.push({ label: "Maximo de " + humanizeField(numericDef.field), value: formatNum(Math.max(...nums)) });
+      insights.push("El promedio de " + humanizeField(numericDef.field) + " es " + formatNum(Math.round(avg)) + ".");
+    }
+  } else if (categoricalDef) {
+    stats.push({ label: "Categorias distintas en " + humanizeField(categoricalDef.field), value: String(new Set(filtered.map(r => r[categoricalDef.field])).size) });
+  }
+
+  // Comparativo periodo a periodo (como "2024 vs 2025"): primer año vs ultimo año
+  let yearCounts = null;
+  if (dateDef) {
+    yearCounts = {};
+    filtered.forEach(r => {
+      const d = r[dateDef.field] instanceof Date ? r[dateDef.field] : new Date(r[dateDef.field]);
+      if (!isNaN(d.getTime())) { const y = d.getUTCFullYear(); yearCounts[y] = (yearCounts[y] || 0) + 1; }
+    });
+    const years = Object.keys(yearCounts).map(Number).sort((a, b) => a - b);
+    if (years.length >= 2) {
+      const first = yearCounts[years[0]], last = yearCounts[years[years.length - 1]];
+      const pct = first ? Math.round(((last - first) / first) * 100) : 0;
+      stats.push({ label: years[0] + " → " + years[years.length - 1], value: first + " → " + last + " (" + (pct >= 0 ? "+" : "") + pct + "%)" });
+      insights.push("Entre " + years[0] + " y " + years[years.length - 1] + ", los registros " + (pct >= 0 ? "aumentaron" : "disminuyeron") + " " + Math.abs(pct) + "%.");
+    }
+  }
+
+  // Graficas: comparativo por año, tendencia, una por CADA columna categorica, y una por cada numerica relevante
+  const charts = [];
+
+  if (dateDef && categoricalDefs.length) {
+    const compareCatDef = categoricalDefs.slice().sort((a, b) => a.values.length - b.values.length)[0];
+    const topCats = Object.entries(
+      filtered.reduce((acc, r) => { const k = String(r[compareCatDef.field] ?? "Sin dato"); acc[k] = (acc[k] || 0) + 1; return acc; }, {})
+    ).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+    const years = Object.keys(yearCounts || {}).sort();
+    if (years.length >= 2 && topCats.length >= 2) {
+      const series = topCats.map(cat => ({
+        name: cat,
+        values: years.map(y => filtered.filter(r => {
+          const d = r[dateDef.field] instanceof Date ? r[dateDef.field] : new Date(r[dateDef.field]);
+          return !isNaN(d.getTime()) && String(d.getUTCFullYear()) === y && String(r[compareCatDef.field] ?? "Sin dato") === cat;
+        }).length)
+      }));
+      charts.push({ type: "grouped-bar", title: humanizeField(compareCatDef.field) + " por año (comparativo)", labels: years, series });
+    }
+  }
+
+  if (dateDef && yearCounts) {
+    const years = Object.keys(yearCounts).sort();
+    if (years.length >= 2) {
+      charts.push({ type: "line", title: "Tendencia de registros por año (" + humanizeField(dateDef.field) + ")", labels: years, values: years.map(y => yearCounts[y]) });
+    }
+  }
+
+  // Una grafica de distribucion por CADA columna categorica (no solo las primeras 3)
+  categoricalDefs.forEach(def => {
+    const groups = {};
+    filtered.forEach(r => { groups[String(r[def.field] ?? "Sin dato")] = (groups[String(r[def.field] ?? "Sin dato")] || 0) + 1; });
+    const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+    if (sorted.length < 2) return;
+    const top = sorted.slice(0, 7);
+    const restSum = sorted.slice(7).reduce((a, e) => a + e[1], 0);
+    const entries = restSum > 0 ? [...top, ["Otros", restSum]] : top;
+    charts.push({
+      type: entries.length <= 6 ? "donut" : "bar",
+      title: "Cantidad de registros por " + humanizeField(def.field),
+      labels: entries.map(e => e[0]),
+      values: entries.map(e => e[1])
+    });
+    const total = sorted.reduce((a, e) => a + e[1], 0);
+    const topShare = Math.round((sorted[0][1] / total) * 100);
+    insights.push("En " + humanizeField(def.field) + ", la categoria predominante es \"" + sorted[0][0] + "\" con " + topShare + "% del total" + (sorted.length > 8 ? " (" + sorted.length + " categorias en total)" : "") + ".");
+  });
+
+  // Una grafica por CADA columna numerica: distribucion de valores si son pocos distintos, o histograma por rangos si son muchos (ej. edades)
+  numericDefs.forEach(def => {
+    const nums = filtered.map(r => Number(r[def.field])).filter(n => !isNaN(n));
+    if (nums.length < 2) return;
+    const distinctVals = Array.from(new Set(nums));
+    if (distinctVals.length <= 10) {
+      const groups = {};
+      nums.forEach(n => { groups[n] = (groups[n] || 0) + 1; });
+      const entries = Object.entries(groups).sort((a, b) => Number(a[0]) - Number(b[0]));
+      charts.push({ type: entries.length <= 6 ? "donut" : "bar", title: "Cantidad de registros por " + humanizeField(def.field), labels: entries.map(e => e[0]), values: entries.map(e => e[1]) });
+    } else {
+      const min = Math.min(...nums), max = Math.max(...nums);
+      if (min === max) return;
+      const binCount = 5;
+      const binSize = (max - min) / binCount;
+      const bins = new Array(binCount).fill(0);
+      nums.forEach(n => { let idx = Math.floor((n - min) / binSize); if (idx >= binCount) idx = binCount - 1; if (idx < 0) idx = 0; bins[idx]++; });
+      const labels = [];
+      for (let i = 0; i < binCount; i++) labels.push(Math.round(min + i * binSize) + "–" + Math.round(min + (i + 1) * binSize));
+      charts.push({ type: "bar", title: "Rangos de " + humanizeField(def.field), labels, values: bins });
+      const maxBinIdx = bins.indexOf(Math.max(...bins));
+      insights.push("El rango de " + humanizeField(def.field) + " con mas registros es " + labels[maxBinIdx] + ".");
+    }
+  });
+
+  if (!charts.length && numericDef) {
+    charts.push({ type: "bar", title: humanizeField(numericDef.field), labels: filtered.slice(0, 30).map((_, i) => "#" + (i + 1)), values: filtered.slice(0, 30).map(r => Number(r[numericDef.field]) || 0) });
+  }
+
+  render({
+    type: "tablero",
+    title: selectedDataset.name + " — " + filtered.length + " registros",
+    category: classifyDataset(selectedDataset.name),
+    filters: activeFilters,
+    stats,
+    insights: insights.slice(0, 6),
+    charts: charts.slice(0, 16),
+    columns: displayFields.map(humanizeField),
+    rows: filtered.slice(0, 50).map(r => displayFields.map(f => formatCell(r[f])))
+  });
+}
+
+function classifyDataset(name) {
+  const n = (name || "").toLowerCase();
+  const rules = [
+    { label: "Trámites", kws: ["tramite", "suit", "servicio al ciudadano"] },
+    { label: "Presupuesto y Finanzas", kws: ["presupuesto", "ejecucion", "gasto", "ingreso", "financ", "contratacion", "secop"] },
+    { label: "Demografía y Población", kws: ["poblacion", "demograf", "censo", "habitantes"] },
+    { label: "Discapacidad", kws: ["discapacidad", "discapacitad"] },
+    { label: "Salud", kws: ["salud", "vacuna", "epidemio", "eps", "hospital", "morbilidad"] },
+    { label: "Educación", kws: ["educacion", "colegio", "matricula", "escolar", "estudiante"] },
+    { label: "Seguridad", kws: ["seguridad", "delito", "crimen", "hurto", "violencia"] },
+    { label: "Movilidad", kws: ["movilidad", "transito", "transporte", "vehicular"] },
+    { label: "Ambiente", kws: ["ambiente", "ambiental", "residuo", "agua", "bosque", "deforest"] },
+    { label: "Agropecuario", kws: ["agricola", "agropecuario", "insumo", "cultivo", "cosecha"] },
+    { label: "Construcción e Infraestructura", kws: ["construccion", "infraestructura", "obra", "vial", "vias", "urbanistic"] },
+  ];
+  for (const r of rules) { if (r.kws.some(k => n.includes(k))) return r.label; }
+  return null;
+}
+
+function formatCell(v) {
+  if (v === undefined || v === null) return "";
+  if (typeof v === "object") return JSON.stringify(v).slice(0, 40);
+  return String(v);
+}
+
+async function consultar(query, dataset) {
+  resultsEl.innerHTML = "";
+  statusEl.style.display = "block";
+  statusEl.textContent = "Consultando " + dataset.name + "...";
+  try {
+    const res = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, datasetId: dataset.id, datasetName: dataset.name })
+    });
+    if (!res.ok) throw new Error("respuesta no valida del servidor");
+    const data = await res.json();
+    statusEl.style.display = "none";
+    render(data);
+  } catch (err) {
+    statusEl.textContent = "No se pudo conectar con el asistente. Verifica que WEBHOOK_URL este configurada y que n8n este activo.";
+  }
+}
+
+let lastRenderedData = null;
+
+function render(data) {
+  lastRenderedData = data;
+  resultsEl.innerHTML = "";
+  resultsActionsEl.style.display = "flex";
+  if (data.type === "resumen") renderResumen(data);
+  else renderTablero(data);
+}
+
+function renderResumen(data) {
+  const kpis = (data.kpis || []).map(k => `
+    <div class="kpi">
+      <div class="label">${k.label}</div>
+      <div class="value">${k.value}</div>
+      ${k.delta ? `<div class="delta">&#8593; ${k.delta}</div>` : ""}
+    </div>`).join("");
+
+  const sectorMax = Math.max(...(data.sectors || [{ value: 1 }]).map(s => s.value));
+  const bars = (data.sectors || []).map(s => `
+    <div class="bar-row">
+      <div class="bar-label"><span>${s.label}</span><span>${formatCOP(s.value)}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(s.value / sectorMax * 100)}%"></div></div>
+    </div>`).join("");
+
+  const achievements = (data.achievements || []).map(a => `
+    <li><span class="check-icon">&#10003;</span><span>${a}</span></li>`).join("");
+
+  resultsEl.innerHTML = `
+    <div class="kpi-grid">${kpis}</div>
+    ${data.sectors ? `<div class="panel"><h2>Inversion ejecutada por sector</h2>${bars}</div>` : ""}
+    ${data.achievements ? `<div class="panel"><h2>Logros destacados</h2><ul class="check-list">${achievements}</ul></div>` : ""}
+  `;
+}
+
+function renderTablero(data) {
+  const chips = (data.filters || []).map(f => `<span class="chip">${f.label}: ${f.value || "todos"}</span>`).join("");
+  const head = (data.columns || []).map(c => `<th>${c}</th>`).join("");
+  const rows = (data.rows || []).map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("");
+
+  const heroStat = (data.stats || [])[0];
+  const restStats = (data.stats || []).slice(1);
+  const restStatsHtml = restStats.map(s => `
+    <div class="kpi">
+      <div class="label">${escapeHtml(s.label)}</div>
+      <div class="value">${escapeHtml(s.value)}</div>
+    </div>`).join("");
+
+  // Contrato nuevo: data.charts (arreglo). Contrato viejo: data.chartSuggestion + data.chartData (compatibilidad con n8n existente).
+  let charts = data.charts;
+  if (!charts && (data.chartSuggestion === "bar" || data.chartSuggestion === "donut")) {
+    if (data.chartData) {
+      charts = [{ type: data.chartSuggestion, title: data.chartData.valueLabel || "", labels: data.chartData.labels, values: data.chartData.values }];
+    } else if (data.rows && data.rows.length) {
+      charts = [{ type: data.chartSuggestion, title: data.columns ? data.columns[1] : "", labels: data.rows.map(r => r[0]), values: data.rows.map(r => Number(String(r[1]).replace(/[^0-9.-]/g, "")) || 0) }];
+    }
+  }
+  charts = (charts || []).slice(0, 16);
+
+  const insightsHtml = (data.insights || []).map(t => `<li>${escapeHtml(t)}</li>`).join("");
+
+  resultsEl.innerHTML = `
+    <div class="exec-summary${data.imageBase64 ? " has-image" : ""}">
+      ${data.imageBase64 ? `<img class="exec-image" src="data:image/png;base64,${data.imageBase64}" alt="Ilustracion generada por IA para ${escapeHtml(data.category || "el dataset")}">` : ""}
+      <div class="exec-text">
+        ${heroStat ? `
+          <div class="hero-stat">
+            <div class="hero-value">${escapeHtml(heroStat.value)}</div>
+            <div class="hero-label">${escapeHtml(heroStat.label)}</div>
+            ${data.category ? `<span class="category-badge">${escapeHtml(data.category)}</span>` : ""}
+          </div>` : ""}
+        ${insightsHtml ? `<ul class="insights-list">${insightsHtml}</ul>` : ""}
+      </div>
+    </div>
+    ${data.imageBase64 ? `<div class="results-actions" style="display:flex"><a class="secondary" style="text-decoration:none;display:inline-block" href="data:image/png;base64,${data.imageBase64}" download="el-rosal-resumen.png">Descargar imagen generada</a></div>` : ""}
+    ${restStatsHtml ? `<div class="kpi-grid">${restStatsHtml}</div>` : ""}
+    <div class="panel">
+      <h2>${escapeHtml(data.title || "Resultado de la consulta")}</h2>
+      ${chips ? `<div class="chips">${chips}</div>` : ""}
+      ${charts.length ? `
+        <div class="${charts.length > 1 ? "chart-grid" : ""}" style="margin-bottom:18px">
+          ${charts.map((c, i) => `
+            <div class="chart-box">
+              ${c.title ? `<p style="font-size:12.5px;font-weight:600;color:var(--text-muted);margin-bottom:6px;text-align:center">${escapeHtml(c.title)}</p>` : ""}
+              <canvas id="chartCanvas${i}" height="${c.type === "donut" ? 200 : 150}"></canvas>
+            </div>`).join("")}
+        </div>` : ""}
+      <div style="overflow-x:auto">
+        <table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>
+      </div>
+    </div>
+  `;
+
+  if (!window.Chart) return;
+  const palette = ["#2E8B57", "#1C3A63", "#5DA88E", "#11233F", "#84C9A8", "#3E7A5C", "#A8D5BD", "#0F2A4A"];
+  charts.forEach((c, i) => {
+    const canvas = document.getElementById("chartCanvas" + i);
+    if (!canvas) return;
+    const isDonut = c.type === "donut";
+    const isLine = c.type === "line";
+    const isGrouped = c.type === "grouped-bar";
+
+    const datasets = isGrouped
+      ? c.series.map((s, j) => ({ label: s.name, data: s.values, backgroundColor: palette[j % palette.length], borderWidth: 0 }))
+      : [{
+          label: c.title || "Valor",
+          data: c.values,
+          backgroundColor: isDonut ? palette : (isLine ? "rgba(46,139,87,0.12)" : "#2E8B57"),
+          borderColor: isLine ? "#2E8B57" : (isDonut ? "#fff" : undefined),
+          borderWidth: isDonut ? 2 : (isLine ? 2 : 0),
+          fill: isLine,
+          tension: isLine ? 0.3 : 0,
+          pointBackgroundColor: isLine ? "#2E8B57" : undefined
+        }];
+
+    new Chart(canvas, {
+      type: isDonut ? "doughnut" : (isLine ? "line" : "bar"),
+      data: { labels: c.labels, datasets },
+      options: {
+        animation: false,
+        plugins: { legend: { display: isDonut || isGrouped, position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+        scales: isDonut ? {} : { y: { beginAtZero: true } }
+      }
+    });
+  });
+}
+
+function formatCOP(n) { return "$" + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " M"; }
+
+/*
+  Tema visual por categoria: color + icono simple, 100% deterministico
+  (sin IA). Si en el futuro el webhook de n8n devuelve una imagen
+  generada (imageBase64), esa se usa en su lugar automaticamente.
+*/
+const CATEGORY_THEME = {
+  "Salud": { color: "#D85A30", icon: '<rect x="15" y="6" width="10" height="28" rx="2"/><rect x="6" y="15" width="28" height="10" rx="2"/>' },
+  "Educación": { color: "#1C7293", icon: '<rect x="4" y="10" width="15" height="20" rx="2"/><rect x="21" y="10" width="15" height="20" rx="2"/>' },
+  "Trámites": { color: "#065A82", icon: '<rect x="6" y="12" width="28" height="20" rx="2"/><rect x="6" y="7" width="12" height="7" rx="2"/>' },
+  "Presupuesto y Finanzas": { color: "#2E8B57", icon: '<rect x="6" y="22" width="7" height="12"/><rect x="16.5" y="14" width="7" height="20"/><rect x="27" y="6" width="7" height="28"/>' },
+  "Demografía y Población": { color: "#7F77DD", icon: '<circle cx="12" cy="14" r="6"/><circle cx="28" cy="14" r="6"/><circle cx="20" cy="24" r="7"/>' },
+  "Discapacidad": { color: "#D4537E", icon: '<circle cx="20" cy="20" r="14" fill-opacity="0.35"/><circle cx="20" cy="20" r="7"/>' },
+  "Seguridad": { color: "#21295C", icon: '<polygon points="20,5 33,11 33,21 20,35 7,21 7,11"/>' },
+  "Movilidad": { color: "#2E6DA4", icon: '<rect x="6" y="10" width="28" height="16" rx="4"/><circle cx="13" cy="30" r="4"/><circle cx="27" cy="30" r="4"/>' },
+  "Ambiente": { color: "#639922", icon: '<ellipse cx="20" cy="20" rx="14" ry="9" transform="rotate(-40 20 20)"/>' },
+  "Agropecuario": { color: "#854F0B", icon: '<rect x="18" y="18" width="4" height="16"/><ellipse cx="12" cy="16" rx="8" ry="5" transform="rotate(-25 12 16)"/><ellipse cx="28" cy="16" rx="8" ry="5" transform="rotate(25 28 16)"/>' },
+  "Construcción e Infraestructura": { color: "#5B6B7A", icon: '<path d="M6 22a14 14 0 0 1 28 0z"/><rect x="4" y="22" width="32" height="6" rx="2"/>' },
+};
+const DEFAULT_THEME = { color: "#11233F", icon: '<rect x="8" y="5" width="24" height="30" rx="2"/><rect x="13" y="13" width="14" height="2.5"/><rect x="13" y="19" width="14" height="2.5"/><rect x="13" y="25" width="9" height="2.5"/>' };
+
+async function generarInfografiaPDF() {
+  if (!lastRenderedData) { alert("Primero carga o consulta un dataset."); return; }
+  const btn = document.getElementById("generarInfografiaBtn");
+  const status = document.getElementById("infografiaStatus");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Llamando al flujo...";
+  status.style.display = "inline";
+  status.style.color = "";
+  status.textContent = "Llamando al flujo de n8n (puede tardar unos segundos)...";
+
+  try {
+    const remoteImage = await pedirImagenAlFlujo(lastRenderedData);
+    status.textContent = "Imagen recibida del flujo. Armando el PDF...";
+    await descargarImagenComoPDF(remoteImage, lastRenderedData);
+    status.textContent = "Listo — infografia generada por el flujo de IA.";
+  } catch (err) {
+    status.style.color = "#A32D2D";
+    status.textContent = "El flujo no genero la infografia: " + err.message;
+  } finally {
+    btn.textContent = originalLabel;
+    btn.disabled = false;
+    setTimeout(() => { status.style.display = "none"; status.style.color = ""; }, 12000);
+  }
+}
+
+async function generarInfografiaSoloLocal() {
+  if (!lastRenderedData) { alert("Primero carga o consulta un dataset."); return; }
+  const btn = document.getElementById("generarInfografiaLocalBtn");
+  const status = document.getElementById("infografiaStatus");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Generando...";
+  status.style.display = "inline";
+  status.style.color = "";
+  status.textContent = "Generando infografia con el diseño local (sin IA)...";
+  try {
+    await generarInfografiaLocal(lastRenderedData);
+    status.textContent = "Listo — infografia generada con el diseño local.";
+  } catch (err) {
+    status.style.color = "#A32D2D";
+    status.textContent = "No se pudo generar la infografia local: " + err.message;
+  } finally {
+    btn.textContent = originalLabel;
+    btn.disabled = false;
+    setTimeout(() => { status.style.display = "none"; status.style.color = ""; }, 8000);
+  }
+}
+
+/*
+  Le pide al flujo de n8n que haga la parte visual (imagen tematica +
+  composicion final) a partir de los datos YA consolidados/totalizados
+  por la consola -- n8n no vuelve a analizar nada, solo redacta y dibuja.
+  A diferencia de la version anterior, esta funcion NUNCA falla en
+  silencio: si algo esta mal (webhook no configurado, no responde, error
+  del servidor, o respuesta sin imagen) lanza un error con el motivo
+  exacto, para que el boton principal jamas entregue un resultado que
+  parezca "generado por IA" sin serlo.
+*/
+async function pedirImagenAlFlujo(analysis) {
+  if (!WEBHOOK_URL || WEBHOOK_URL.includes("REEMPLAZAR")) {
+    throw new Error("WEBHOOK_URL todavia tiene el valor de ejemplo. Reemplazalo por la URL real de tu webhook de n8n activo (ver README).");
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  let res;
+  try {
+    res = await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "infografia", analysis }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === "AbortError") {
+      throw new Error("no respondio en 25 segundos. Verifica que el workflow este Activo en n8n y que el microservicio de imagenes (html-image-service) este corriendo.");
+    }
+    throw new Error("no se pudo conectar con el webhook. Revisa la URL, que n8n sea accesible desde internet (HTTPS), y la consola del navegador (F12) para mas detalle.");
+  }
+  clearTimeout(timeout);
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => "");
+    throw new Error("el flujo respondio con error " + res.status + ". " + bodyText.slice(0, 180));
+  }
+  const data = await res.json().catch(() => null);
+  if (!data || !data.imageBase64) {
+    throw new Error("el flujo respondio pero sin imagen (imageBase64). Revisa el nodo 'HTML a imagen' y 'Responder al webhook' en n8n.");
+  }
+  return data.imageBase64;
+}
+
+function descargarImagenComoPDF(imageBase64, analysis) {
+  return new Promise((resolve, reject) => {
+    if (!window.jspdf) { reject(new Error("jsPDF no cargo")); return; }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const { jsPDF } = window.jspdf;
+        const orientation = img.width > img.height ? "landscape" : "portrait";
+        const pdf = new jsPDF({ orientation, unit: "pt", format: "a4" });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const imgWidth = pageWidth;
+        const imgHeight = img.height * (imgWidth / img.width);
+        pdf.addImage(img, "PNG", 0, 0, imgWidth, imgHeight);
+        const fileName = "infografia-el-rosal-" + (selectedDataset ? selectedDataset.name : (analysis.title || "resultado"))
+          .toString().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 50) + ".pdf";
+        pdf.save(fileName || "infografia-el-rosal.pdf");
+        resolve();
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => reject(new Error("No se pudo cargar la imagen generada por el flujo"));
+    img.src = "data:image/png;base64," + imageBase64;
+  });
+}
+
+/*
+  Respaldo local: arma la misma infografia con reglas fijas (tema por
+  categoria, sin IA) usando html2canvas + jsPDF. Se usa mientras el
+  webhook de n8n no este configurado, o si falla momentaneamente.
+*/
+/*
+  Paleta calida y natural para las graficas de la infografia local:
+  terracota, ocre, oliva, cafe tierra, arcilla, salvia, mostaza, musgo.
+  Se usa siempre la misma paleta para todas las graficas (no el color de
+  categoria), rotando un tono distinto por grafica para que se vean
+  variadas sin ser estridentes.
+*/
+const WARM_PALETTE = ["#C1694F", "#D9A441", "#8A9B4E", "#8B5E3C", "#C97B63", "#B98B4E", "#7C9070", "#A85C4D", "#D6B370", "#6E7F4E"];
+
+async function generarInfografiaLocal(data) {
+  if (!window.html2canvas || !window.jspdf || !window.Chart) { throw new Error("Librerias de exportacion no disponibles"); }
+
+  const theme = CATEGORY_THEME[data.category] || DEFAULT_THEME;
+  const heroImg = data.imageBase64
+    ? `<img src="data:image/png;base64,${data.imageBase64}" style="width:84px;height:84px;border-radius:16px;object-fit:cover">`
+    : `<div style="width:84px;height:84px;border-radius:16px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center">
+         <svg width="44" height="44" viewBox="0 0 40 40" fill="#fff">${theme.icon}</svg>
+       </div>`;
+
+  const stats = (data.stats || []).slice(0, 4);
+  const statCirclesHtml = stats.map(s => `
+    <div style="flex:1;min-width:130px;background:#F6F3EE;border-radius:14px;padding:16px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:${WARM_PALETTE[0]}">${escapeHtml(s.value)}</div>
+      <div style="font-size:11px;color:#6B6259;margin-top:4px">${escapeHtml(s.label)}</div>
+    </div>`).join("");
+
+  const chartsToShow = (data.charts || []).slice(0, 12);
+  const chartBlocksHtml = chartsToShow.map((c, i) => `
+    <div style="background:#fff;border:1px solid #E8E1D8;border-radius:12px;padding:16px">
+      <p style="font-size:12px;font-weight:600;color:#3A332C;margin:0 0 10px;text-align:center">${escapeHtml(c.title)}</p>
+      <canvas id="infoChart${i}" height="${c.type === "donut" ? 170 : 130}"></canvas>
+    </div>`).join("");
+
+  const container = document.createElement("div");
+  container.style.cssText = "position:fixed;left:-9999px;top:0;width:860px;background:#fff;font-family:'Segoe UI',Arial,sans-serif";
+  container.innerHTML = `
+    <div style="background:${theme.color};padding:28px 32px;display:flex;gap:20px;align-items:center;border-radius:0">
+      ${heroImg}
+      <div style="color:#fff">
+        <p style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.85;margin:0 0 6px">${escapeHtml(data.category || "Datos Abiertos")} &middot; El Rosal</p>
+        <h1 style="font-size:24px;margin:0">${escapeHtml(data.title || "Resumen de datos abiertos")}</h1>
+      </div>
+    </div>
+    <div style="padding:28px 32px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px">${statCirclesHtml}</div>
+      ${chartBlocksHtml ? `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px">${chartBlocksHtml}</div>` : ""}
+      <p style="font-size:10.5px;color:#9A9186;margin-top:22px">Generado automaticamente a partir de ${escapeHtml(data.title || "")} el ${new Date().toLocaleDateString("es-CO")}.</p>
+    </div>
+  `;
+  document.body.appendChild(container);
+
+  const chartInstances = [];
+  chartsToShow.forEach((c, i) => {
+    const canvas = container.querySelector("#infoChart" + i);
+    if (!canvas) return;
+    const isDonut = c.type === "donut";
+    const isLine = c.type === "line";
+    const isGrouped = c.type === "grouped-bar";
+    const baseColor = WARM_PALETTE[i % WARM_PALETTE.length];
+
+    const datasets = isGrouped
+      ? (c.series || []).map((s, j) => ({ label: s.name, data: s.values, backgroundColor: WARM_PALETTE[(i + j) % WARM_PALETTE.length] }))
+      : [{
+          label: c.title || "Valor",
+          data: c.values,
+          backgroundColor: isDonut ? c.labels.map((_, j) => WARM_PALETTE[(i + j) % WARM_PALETTE.length]) : baseColor,
+          borderColor: isLine ? baseColor : "#fff",
+          borderWidth: isDonut ? 2 : (isLine ? 2 : 0),
+          fill: isLine,
+          tension: isLine ? 0.3 : 0,
+          pointBackgroundColor: isLine ? baseColor : undefined,
+        }];
+
+    chartInstances.push(new Chart(canvas, {
+      type: isDonut ? "doughnut" : (isLine ? "line" : "bar"),
+      data: { labels: c.labels, datasets },
+      options: {
+        responsive: false,
+        animation: false,
+        plugins: { legend: { display: isDonut || isGrouped, position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } } },
+        scales: isDonut ? {} : { y: { beginAtZero: true } },
+      },
+    }));
+  });
+
+  try {
+    await new Promise(r => setTimeout(r, 250));
+    const canvas = await html2canvas(container, { scale: 2, backgroundColor: "#ffffff" });
+    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+    const margin = 0;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = canvas.height * (imgWidth / canvas.width);
+    let heightLeft = imgHeight;
+    let position = 0;
+    pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+    const fileName = "infografia-el-rosal-" + (selectedDataset ? selectedDataset.name : "resultado")
+      .toString().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 50) + ".pdf";
+    pdf.save(fileName || "infografia-el-rosal.pdf");
+  } finally {
+    chartInstances.forEach(ch => ch.destroy());
+    document.body.removeChild(container);
+  }
+}
+
+
+async function downloadPDF() {
+  if (!window.html2canvas || !window.jspdf) { alert("La libreria de exportacion no cargo. Verifica tu conexion e intenta de nuevo."); return; }
+  const btn = document.getElementById("downloadPdfBtn");
+  const originalLabel = btn.textContent;
+  btn.textContent = "Generando PDF...";
+  btn.disabled = true;
+  try {
+    await new Promise(r => setTimeout(r, 300));
+    const canvas = await html2canvas(resultsEl, { scale: 2, backgroundColor: "#ffffff" });
+    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+    const margin = 24;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth - margin * 2;
+    const imgHeight = canvas.height * (imgWidth / canvas.width);
+
+    pdf.setFontSize(13);
+    pdf.text("El Rosal — asistente de datos abiertos", margin, margin);
+    let heightLeft = imgHeight;
+    let position = margin + 14;
+    pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+    heightLeft -= (pageHeight - position - margin);
+    while (heightLeft > 0) {
+      pdf.addPage();
+      position = heightLeft - imgHeight + margin;
+      pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - margin * 2);
+    }
+    const fileName = "el-rosal-" + (selectedDataset ? selectedDataset.name : "resultado")
+      .toString().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60) + ".pdf";
+    pdf.save(fileName || "el-rosal-resultado.pdf");
+  } catch (err) {
+    alert("No se pudo generar el PDF. Intenta de nuevo.");
+  } finally {
+    btn.textContent = originalLabel;
+    btn.disabled = false;
+  }
+}
+
+function demoResumenData() {
+  return {
+    type: "resumen",
+    kpis: [
+      { label: "Ejecucion presupuestal", value: "95,3%", delta: "+3,2 pts vs 2024" },
+      { label: "Cobertura de agua", value: "95,5%" },
+      { label: "Cobertura educativa", value: "96,2%" },
+      { label: "Plan de desarrollo", value: "87,3%", delta: "+6,1 pts vs 2024" }
+    ],
+    sectors: [
+      { label: "Educacion", value: 4698 }, { label: "Salud", value: 3810 },
+      { label: "Infraestructura vial", value: 2280 }, { label: "Agua y saneamiento", value: 2010 }
+    ],
+    achievements: [
+      "Cobertura de agua potable del 95,5%",
+      "33,2 km de vias intervenidas",
+      "16.800 arboles sembrados"
+    ]
+  };
+}
+
+function demoTableroData() {
+  return {
+    type: "tablero",
+    title: "Tramites SUIT El Rosal — 69 registros",
+    category: "Trámites",
+    filters: [],
+    stats: [
+      { label: "Total de registros", value: "69" },
+      { label: "Categorias distintas en Tipo", value: "2" },
+      { label: "2017 → 2018", value: "8 → 61 (+663%)" }
+    ],
+    insights: [
+      "Se analizaron 69 registros en total.",
+      "Entre 2017 y 2018, los registros aumentaron 663%.",
+      "En Costo, la categoria predominante es \"Gratuito\" con 83% del total.",
+      "En Medio, la categoria predominante es \"Presencial\" con 97% del total."
+    ],
+    charts: [
+      { type: "grouped-bar", title: "Tipo por año (comparativo)", labels: ["2017", "2018"], series: [
+        { name: "Plantilla Único - Hijo", values: [6, 42] },
+        { name: "Modelo Único – Hijo", values: [2, 19] }
+      ]},
+      { type: "line", title: "Tendencia de registros por año", labels: ["2017", "2018"], values: [8, 61] },
+      { type: "donut", title: "Cantidad de registros por Costo", labels: ["Gratuito", "Con costo"], values: [57, 12] },
+      { type: "donut", title: "Cantidad de registros por Medio", labels: ["Presencial", "Presencial / Virtual"], values: [67, 2] },
+      { type: "donut", title: "Cantidad de registros por Tipo", labels: ["Plantilla Único - Hijo", "Modelo Único – Hijo"], values: [48, 21] }
+    ],
+    columns: ["Tramite", "Tipo", "Costo", "Tiempo de obtencion"],
+    rows: [
+      ["Certificado de residencia", "Plantilla Único - Hijo", "Gratuito", "1 día hábil"],
+      ["Licencia urbanística", "Modelo Único – Hijo", "Con costo", "30 días hábiles"],
+      ["Certificado de paz y salvo", "Plantilla Único - Hijo", "Gratuito", "1 día hábil"]
+    ]
+  };
+}
+
+
+function demoImagenData() {
+  return {
+    type: "tablero",
+    title: "Tramites SUIT El Rosal",
+    category: "Tramites",
+    imageBase64: "iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAIAAAD2HxkiAAAF2UlEQVR4nO3bO5IVNxiA0YuLZbAKMiZxQMAiHJKSOmEBJE69BS/CAYEjMq/JAVUuYF6Xme7+JPU5MVX8Uum70rxevLp5fwE6v9QDwNmJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoTYy3oAfs7bj2+u+WefP33ZexK28uLVzft6Bh5xZXj3EeTgRDiuZ7Z3mxrHJMLhbN7ebWociggHckB+35LiIEQ4hIPz+5YUc35E0QsLzP93Lm7C1lABuBIrbsLMUAVexpvnPETYGPPEjznV8jxHjzbFQfc0PZKb8FBTFHiZZ841iPA4c53suaadmggPMuOZnnHmGYkQYiI8wrxXyryTT0SEu5v9HM8+//hEuK81TvAaqxiWCCEmwh2tdIGstJbRiHAv653a9VY0CBFCTIS7WPXSWHVdLRFCTITbW/u6WHt1CRFCTIQQE+HGzvBaO8MajyRCiIkQYiLc0nneaedZ6QFECDERQkyEEBPhZs72ZdLZ1rsfEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEW7m86cv9QiHOtt69yNCiIkQYiKEmAi3dJ4vk86z0gOIEGIihJgIN3aGd9oZ1ngkEUJMhBAT4fbWfq2tvbqECCEmwl2sel2suq6WCCEmwr2sd2mst6JBiHBHK53aldYyGhFCTIT7WuMCWWMVwxLh7mY/wbPPPz4RHmHeczzv5BMRIcREeJAZr5QZZ56RCI8z15mea9qpifBQs5zsWeZcw4tXN+/rGc7o7cc39Qh3k9/x3ISNMc/6mFMtT4SZ0U78aPOch+doL3+ayq/lJuy1DSgw5yYcyMFXovwGIcLhHJCi/IYiwnFtXqP2xiTCCTyzRu0NToSTuTJI4U1EhBDzIwqIiRBiIoSYCCEmQoiJEGIihJgIIfayHmBu+Z8CjsPv6DyZ35h5Cu09QI0/S4Q/R35XkuL1RHgt+T2BFK/hGzNXUeDT2LdriPBxTtJz2L1HifARztDz2cOHifAhTs9W7OQDRHgv52Zb9vM+IrybE7MHu3onEUJMhHfwgb0fe3ubCCEmwh/5qN6bHf6BCCEmQoiJ8DteSsewz98SIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEULsZT0AW/rj19/qEa52a9TX7z4kg+TchOuYqcC7/Pv3n/UIDREuYvYCvzpnhyJcwRoFfnXCDkU4vZUK/OpsHYoQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCCEmQoiJEGIihJgIISZCiIkQYiKEmAghJkKIiRBiIoSYCKf3+z9/1SNs7PW7D/UIhxLhClbq8GwFXkS4jDU6PGGBFxGuZPYOz1ng5XJ5WQ/Alibq8POnL/UIo3ATQkyEEBMhxET4HV+oHMM+f0uEEBMhxET4Iy+lvdnhH4gQYiK8g4/q/djb20QIMRHezQf2HuzqnUR4LydmW/bzPiJ8iHOzFTv5ABE+wul5Pnv4MBE+zhl6Drv3KBFexUl6Gvt2jRevbt7XM8zk7cc39QhzkN/1RPgUUnyA/H6WCJ9Fjf/T3pOJEGK+MQMxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEUJMhBATIcRECDERQkyEEBMhxEQIMRFCTIQQEyHERAgxEULsP7KMCYEyxWt7AAAAAElFTkSuQmCC",
+    stats: [
+      { label: "Total de registros", value: "69" },
+      { label: "Categorias distintas en Tipo", value: "2" },
+      { label: "2017 -> 2018", value: "8 -> 61 (+663%)" }
+    ],
+    insights: [
+      "Se analizaron 69 registros en total.",
+      "Entre 2017 y 2018, los registros aumentaron 663%.",
+      "En Costo, la categoria predominante es Gratuito con 83% del total."
+    ],
+    charts: [
+      { type: "donut", title: "Cantidad de registros por Costo", labels: ["Gratuito", "Con costo"], values: [57, 12] },
+      { type: "donut", title: "Cantidad de registros por Tipo", labels: ["Plantilla Unico - Hijo", "Modelo Unico"], values: [48, 21] },
+      { type: "line", title: "Tendencia de registros por año", labels: ["2017", "2018"], values: [8, 61] },
+      { type: "bar", title: "Cantidad de registros por Tiempo de obtencion", labels: ["5 dias", "15 dias", "Inmediata", "10 dias"], values: [17, 14, 12, 7] }
+    ],
+    columns: ["Tramite", "Tipo", "Costo"],
+    rows: [
+      ["Certificado de residencia", "Plantilla Unico - Hijo", "Gratuito"],
+      ["Licencia urbanistica", "Modelo Unico", "Con costo"]
+    ]
+  };
+}
+
+</script>
+</body>
+</html>

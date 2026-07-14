@@ -1,0 +1,17 @@
+/*
+  Variables de marca compartidas por los módulos de frontend/.
+  Los archivos index.html actuales (dashboard, verificador-calidad)
+  incluyen sus propios estilos inline por simplicidad — este archivo
+  queda como referencia para cuando se separen en módulos con build.
+*/
+:root {
+  --navy: #11233F;
+  --secondary: #1C3A63;
+  --green: #2E8B57;
+  --mint: #5FB49C;
+  --bg: #F3F5F7;
+  --card: #FFFFFF;
+  --border: #E2E6EA;
+  --text: #1A2433;
+  --text-muted: #5B6B7A;
+}

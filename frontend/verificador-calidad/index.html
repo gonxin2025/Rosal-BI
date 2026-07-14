@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificador de Calidad — Datos Abiertos El Rosal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+  :root{
+    --navy:#11233F; --green:#2E8B57; --bg:#F3F5F7; --card:#FFFFFF;
+    --border:#E2E6EA; --text:#1A2433; --text-muted:#5B6B7A;
+    --amber:#C97B0C; --amber-bg:#FBEFD9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);padding:0 0 3rem}
+  header{background:var(--navy);color:#fff;padding:2rem 1.5rem}
+  .inner{max-width:900px;margin:0 auto}
+  header h1{font-size:24px;font-weight:700;margin-bottom:6px}
+  header p{font-size:13.5px;color:#B9C4D4}
+  main{max-width:900px;margin:1.5rem auto 0;padding:0 1.5rem}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.4rem 1.6rem;margin-bottom:1.25rem}
+  .panel h2{font-size:15px;font-weight:700;margin-bottom:14px;color:var(--navy)}
+  label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px}
+  input[type=text]{
+    width:100%;font-family:inherit;font-size:13.5px;padding:10px 12px;
+    border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text);box-sizing:border-box;
+  }
+  .row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .row > div{flex:1;min-width:220px}
+
+  .file-drop{
+    border:2px dashed var(--border);border-radius:10px;padding:2rem;text-align:center;
+    cursor:pointer;transition:border-color .15s;
+  }
+  .file-drop:hover, .file-drop.drag{border-color:var(--green)}
+  .file-drop p{font-size:13.5px;color:var(--text-muted)}
+  .file-drop p.filename{color:var(--navy);font-weight:600;margin-top:6px}
+  input[type=file]{display:none}
+
+  button{
+    font-family:inherit;font-size:14px;font-weight:600;background:var(--green);color:#fff;
+    border:none;border-radius:8px;padding:11px 22px;cursor:pointer;
+  }
+  button:hover{background:#256e46}
+  button:disabled{background:#A9C4B4;cursor:not-allowed}
+  button.secondary{background:transparent;color:var(--navy);border:1px solid var(--border)}
+  button.secondary:hover{background:#F0F2F4}
+
+  #status{font-size:13px;color:var(--text-muted);margin-top:12px;display:none}
+
+  .verdict-panel{border-left:5px solid var(--green)}
+  .verdict-panel.has-issues{border-left-color:var(--amber)}
+  .verdict-panel h2{font-size:17px}
+  .verdict-sub{font-size:13px;color:var(--text-muted);margin-bottom:16px}
+
+  .err-code{display:inline-block;background:var(--amber-bg);color:#9A6A0C;font-weight:700;font-size:11.5px;padding:3px 9px;border-radius:6px;white-space:nowrap}
+  .err-code.manual{background:#EAF3F7;color:#065A82}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  th{background:var(--navy);color:#fff;text-align:left;padding:10px 12px;font-weight:600}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:nth-child(even) td{background:#FAFBFC}
+  table a{color:var(--navy);font-weight:600}
+
+  .manual-list{list-style:none;margin-top:10px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--text-muted)}
+
+  .desc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:10px}
+  .desc-row input{font-size:12.5px;padding:8px 10px}
+
+  footer{max-width:900px;margin:1.5rem auto 0;padding:0 1.5rem;font-size:11px;color:var(--text-muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="inner">
+    <h1>Verificador de Calidad de Datos Abiertos</h1>
+    <p>Alcaldía de El Rosal — revisa tu Excel o CSV antes de subirlo a datos.gov.co</p>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>1. Sube el archivo o carga desde una URL (datos federados)</h2>
+    <div class="file-drop" id="fileDrop">
+      <p>Haz clic aquí o arrastra tu archivo (.xlsx, .xls o .csv)</p>
+      <p class="filename" id="fileNameLabel"></p>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+
+    <p style="text-align:center;font-size:12px;color:var(--text-muted);margin:14px 0">— o —</p>
+
+    <label for="urlInput">URL del recurso (CSV, XLSX, JSON o API de datos.gov.co)</label>
+    <div style="display:flex;gap:10px">
+      <input type="text" id="urlInput" placeholder="https://www.datos.gov.co/resource/xxxx-xxxx.json">
+      <button class="secondary" id="cargarUrlBtn" type="button" style="white-space:nowrap">Cargar desde URL</button>
+    </div>
+    <p style="font-size:11.5px;color:var(--text-muted);margin-top:6px">Así se publican los "datos federados": en vez de subir el archivo a datos.gov.co, apuntas a un enlace en tu propio servidor. Esta opción revisa ese mismo enlace, incluyendo si apunta a un formato abierto (ERR010).</p>
+  </div>
+
+  <div class="panel">
+    <h2>2. Metadata del conjunto de datos (opcional)</h2>
+    <div class="row">
+      <div>
+        <label for="metaTitulo">Título propuesto para publicar</label>
+        <input type="text" id="metaTitulo" placeholder="Ej: Trámites y servicios de la Alcaldía">
+      </div>
+      <div>
+        <label for="metaDescripcion">Descripción general</label>
+        <input type="text" id="metaDescripcion" placeholder="De qué trata este conjunto de datos...">
+      </div>
+    </div>
+    <p style="font-size:11.5px;color:var(--text-muted)">Si los dejas vacíos, igual se revisa el archivo — solo no se podrán chequear los errores relacionados con el título y la descripción.</p>
+  </div>
+
+  <button id="verificarBtn" disabled>Verificar calidad</button>
+  <p id="status"></p>
+
+  <div id="resultado" style="margin-top:1.5rem"></div>
+</main>
+
+<footer>
+  Verificación instantánea basada en el listado oficial de errores de calidad de datos.gov.co (ERR001–ERR022, consultado de su propio dataset público). No reemplaza la revisión oficial del portal.
+</footer>
+
+<script>
+/* =========================================================================
+   ESTADO
+   ========================================================================= */
+let loadedRows = [];
+let rawRows = [];
+let removedSummaryRowsCount = 0;
+let columnDescriptions = {};
+let currentFileName = "";
+let lastAnalysis = null;
+let sourceUrlFormatIssue = null; // se llena solo cuando la fuente es una URL (ERR010)
+
+/* =========================================================================
+   CARGA DE ARCHIVO
+   ========================================================================= */
+const fileDrop = document.getElementById("fileDrop");
+const fileInput = document.getElementById("fileInput");
+const fileNameLabel = document.getElementById("fileNameLabel");
+const verificarBtn = document.getElementById("verificarBtn");
+const statusEl = document.getElementById("status");
+
+fileDrop.addEventListener("click", () => fileInput.click());
+fileDrop.addEventListener("dragover", e => { e.preventDefault(); fileDrop.classList.add("drag"); });
+fileDrop.addEventListener("dragleave", () => fileDrop.classList.remove("drag"));
+fileDrop.addEventListener("drop", e => {
+  e.preventDefault();
+  fileDrop.classList.remove("drag");
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+async function handleFile(file) {
+  statusEl.style.display = "block";
+  statusEl.textContent = "Leyendo " + file.name + "...";
+  currentFileName = file.name;
+  sourceUrlFormatIssue = null;
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type: "array", cellDates: true });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (!rows.length) { statusEl.textContent = "El archivo no tiene filas de datos."; return; }
+    rawRows = rows;
+    loadedRows = cleanRows(rows);
+    columnDescriptions = {};
+    document.getElementById("metaTitulo").value = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+    fileNameLabel.textContent = file.name + " — " + loadedRows.length + " filas listas";
+    verificarBtn.disabled = false;
+    statusEl.textContent = "Archivo cargado. Presiona \"Verificar calidad\" cuando estés listo.";
+    document.getElementById("resultado").innerHTML = "";
+  } catch (err) {
+    statusEl.textContent = "No se pudo leer el archivo. Verifica que sea un Excel (.xlsx/.xls) o CSV válido.";
+  }
+}
+
+/*
+  Carga desde una URL en vez de un archivo local -- asi es como se
+  publican los "datos federados" en datos.gov.co: en vez de subir el
+  archivo, se apunta a un enlace propio. ERR010 exige que ese enlace
+  vaya directo a un formato abierto (CSV/XLS/XLSX/JSON/KML/KMZ/ZIP), no
+  a una pagina, un PDF, una imagen o un documento de Word.
+*/
+const OPEN_FORMAT_EXTENSIONS = /\.(csv|xlsx?|json|kml|kmz|zip)(\?|#|$)/i;
+const CLOSED_FORMAT_EXTENSIONS = /\.(pdf|docx?|pptx?|jpe?g|png|gif|html?)(\?|#|$)/i;
+
+const urlInput = document.getElementById("urlInput");
+const cargarUrlBtn = document.getElementById("cargarUrlBtn");
+cargarUrlBtn.addEventListener("click", () => handleUrl(urlInput.value.trim()));
+
+async function handleUrl(url) {
+  if (!url) { alert("Pega la URL del recurso a verificar."); return; }
+  statusEl.style.display = "block";
+  currentFileName = url;
+  sourceUrlFormatIssue = null;
+
+  if (CLOSED_FORMAT_EXTENSIONS.test(url)) {
+    sourceUrlFormatIssue = "El enlace apunta a un archivo de formato cerrado (" + url.match(CLOSED_FORMAT_EXTENSIONS)[1].toUpperCase() + "), no a un formato de datos abierto.";
+    statusEl.textContent = "El enlace no apunta a un formato de datos abierto. Revisa el detalle en \"Verificar calidad\".";
+    rawRows = []; loadedRows = []; verificarBtn.disabled = true;
+    document.getElementById("resultado").innerHTML = "";
+    return;
+  }
+  if (!OPEN_FORMAT_EXTENSIONS.test(url) && !/\/resource\/|\.json(\?|$)/i.test(url)) {
+    sourceUrlFormatIssue = "No se pudo confirmar por la URL que apunte a un formato abierto (CSV/XLS/XLSX/JSON/KML/KMZ/ZIP). Revisa que el enlace vaya directo al archivo, no a una página que lo contiene.";
+  }
+
+  statusEl.textContent = "Consultando " + url + "...";
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("El servidor respondió con error " + res.status);
+    const contentType = res.headers.get("content-type") || "";
+
+    if (/pdf|word|powerpoint|image\//i.test(contentType)) {
+      sourceUrlFormatIssue = "El servidor indica que el contenido es \"" + contentType + "\", un formato cerrado, no datos abiertos.";
+      statusEl.textContent = "El enlace no apunta a un formato de datos abierto. Revisa el detalle en \"Verificar calidad\".";
+      rawRows = []; loadedRows = []; verificarBtn.disabled = true;
+      return;
+    }
+
+    let rows;
+    if (/json/i.test(contentType) || /\.json(\?|$)/i.test(url)) {
+      const json = await res.json();
+      rows = Array.isArray(json) ? json : (json.data || json.results || json.records || json.rows || []);
+    } else {
+      const buf = await res.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    }
+
+    if (!rows.length) { statusEl.textContent = "El recurso respondió, pero no se encontraron filas de datos."; return; }
+    rawRows = rows;
+    loadedRows = cleanRows(rows);
+    columnDescriptions = {};
+    document.getElementById("metaTitulo").value = url.split("/").pop().replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
+    fileNameLabel.textContent = url + " — " + loadedRows.length + " filas listas";
+    verificarBtn.disabled = false;
+    statusEl.textContent = "Recurso cargado desde la URL. Presiona \"Verificar calidad\" cuando estés listo.";
+    document.getElementById("resultado").innerHTML = "";
+  } catch (err) {
+    statusEl.textContent = "No se pudo cargar esa URL. Verifica que exista, que el servidor permita llamadas desde el navegador (CORS), y que sea accesible públicamente. (" + err.message + ")";
+  }
+}
+
+
+function cleanRows(rows) {
+  if (!rows.length) return rows;
+  const fieldCount = Object.keys(rows[0]).length;
+  const cleaned = rows.filter(r => {
+    const filled = Object.values(r).filter(v => v !== undefined && v !== null && v !== "").length;
+    return filled >= fieldCount * 0.4;
+  });
+  removedSummaryRowsCount = rows.length - cleaned.length;
+  return cleaned;
+}
+
+function humanizeField(field) {
+  return String(field).replace(/_/g, " ").split(" ")
+    .map(w => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w)
+    .join(" ");
+}
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function escapeAttr(str) { return String(str).replace(/"/g, "&quot;"); }
+
+/* =========================================================================
+   VERIFICADOR DE CALIDAD — listado oficial de datos.gov.co
+   (dataset publico: https://www.datos.gov.co/resource/xbc7-65j4)
+   ========================================================================= */
+const QUALITY_LINKS = {
+  ERR001: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR002: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR004: "https://herramientas.datos.gov.co/es/content/publicar-conjuntos-de-datos",
+  ERR005: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR006: "https://www.datos.gov.co/stories/s/Conjuntos-de-Datos-Obligatorios-Ley-1712-de-2014/724h-3u74",
+  ERR007: "https://www.datos.gov.co/stories/s/rkeb-yz5f",
+  ERR008: "https://www.datos.gov.co/stories/s/rkeb-yz5f",
+  ERR008_1: "https://drive.google.com/file/d/1H3w0p_qXm_NZAw-YVZUUK-GG8BIV1EYA/view",
+  ERR008_2: "https://drive.google.com/file/d/1H3w0p_qXm_NZAw-YVZUUK-GG8BIV1EYA/view",
+  ERR008_3: "https://drive.google.com/file/d/1H3w0p_qXm_NZAw-YVZUUK-GG8BIV1EYA/view",
+  ERR009: "https://support.socrata.com/hc/en-us/sections/360000042208-Maps",
+  ERR010: "https://herramientas.datos.gov.co/es/content/publicar-conjuntos-de-datos",
+  ERR011: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR016: "https://drive.google.com/file/d/1jiuxTrsXyz_rEtkTpG9MR3qC-yTGUhw_/view",
+  ERR018: "https://www.archivogeneral.gov.co/sites/default/files/Estructura_Web/5_Consulte/Recursos/Publicacionees/Guia_de_Anonimizacion-min.pdf",
+  ERR019: "https://herramientas.datos.gov.co/es/content/publicar-conjuntos-de-datos",
+  ERR020: "https://herramientas.datos.gov.co/es/content/publicar-conjuntos-de-datos",
+};
+
+const MANUAL_CHECK_CODES = [
+  { codigo: "ERR003", nota: "El nombre de usuario de la cuenta no debe ser el de una persona, sino el de la entidad." },
+  { codigo: "ERR010", nota: "Si vas a publicar por enlace (no por archivo), el enlace debe apuntar a CSV/XLS/XLSX/JSON/KML/KMZ/ZIP, nunca a PDF/imagen/Word." },
+  { codigo: "ERR012", nota: "Verifica que este conjunto no sea un duplicado de uno ya publicado por una entidad nacional." },
+  { codigo: "ERR014", nota: "El dataset debe actualizarse según la frecuencia que declares en la metadata (ej. mensual, anual)." },
+  { codigo: "ERR015", nota: "Si tienes varios archivos con exactamente las mismas columnas, conviene unirlos en un solo dataset." },
+];
+
+verificarBtn.addEventListener("click", verificarCalidad);
+
+function verificarCalidad() {
+  if (!loadedRows.length) return;
+  const fields = Object.keys(loadedRows[0]).filter(f => !f.startsWith(":"));
+  const total = loadedRows.length;
+  const issues = [];
+  const datasetMeta = {
+    titulo: document.getElementById("metaTitulo").value,
+    descripcion: document.getElementById("metaDescripcion").value,
+  };
+
+  if (total === 0) {
+    issues.push({ codigo: "ERR004", descripcion: "El conjunto de datos no tiene ningún registro con información.",
+      solucion: "Elimina este conjunto y publica uno nuevo con columnas y registros reales.", link: QUALITY_LINKS.ERR004 });
+  }
+  if (total > 0 && total < 50) {
+    issues.push({ codigo: "ERR005", descripcion: "El conjunto tiene " + total + " registros. Con menos de 50 se limita su utilidad (esta regla no aplica si el dato es obligatorio por ley).",
+      solucion: "Amplía el número de registros: agrega información histórica, más columnas, o consolida con datos relacionados.", link: QUALITY_LINKS.ERR005 });
+  }
+  if (fields.length === 1) {
+    issues.push({ codigo: "ERR008", descripcion: "El conjunto de datos solo tiene una columna, insuficiente para análisis.",
+      solucion: "Publica un dataset nuevo con más columnas y registros.", link: QUALITY_LINKS.ERR008 });
+  } else if (fields.length < 5) {
+    issues.push({ codigo: "ERR008_1", descripcion: "El conjunto tiene " + fields.length + " columnas. Con menos de 5 se limitan las posibilidades de análisis.",
+      solucion: "Enriquece el conjunto agregando más columnas con información relevante.", link: QUALITY_LINKS.ERR008_1 });
+  }
+  const unnamedCols = fields.filter(f => /^(unnamed|column\d*|__empty|f\d+|campo\d*)$/i.test(f.trim()) || !f.trim());
+  if (unnamedCols.length) {
+    issues.push({ codigo: "ERR008_2", descripcion: "Columnas sin nombre claro (aparecen como '" + unnamedCols[0] + "' o similar): " + unnamedCols.length + " columna(s).",
+      solucion: "Asigna un nombre claro a cada columna antes de publicar.", link: QUALITY_LINKS.ERR008_2 });
+  }
+
+  const emptyCols = [];
+  fields.forEach(f => {
+    const empty = loadedRows.filter(r => r[f] === undefined || r[f] === null || String(r[f]).trim() === "").length;
+    const pct = empty / total;
+    if (pct > 0.05) emptyCols.push({ field: f, pct });
+  });
+  if (emptyCols.length) {
+    issues.push({ codigo: "ERR007", descripcion: "Celdas vacías o sin información en: " + emptyCols
+      .sort((a, b) => b.pct - a.pct).slice(0, 6)
+      .map(c => humanizeField(c.field) + " (" + Math.round(c.pct * 100) + "% vacío)").join(", ")
+      + (emptyCols.length > 6 ? " y " + (emptyCols.length - 6) + " más" : "") + ".",
+      solucion: "Revisa y completa los campos vacíos. Se puede usar OpenRefine u otra herramienta de calidad de datos.", link: QUALITY_LINKS.ERR007 });
+  }
+
+  const tieneDireccion = fields.some(f => /direcci[oó]n|address/i.test(f));
+  const tieneCoords = fields.some(f => /latitud|longitud|\blat\b|\blon\b|\blng\b|coordenada/i.test(f));
+  if (tieneDireccion && !tieneCoords) {
+    issues.push({ codigo: "ERR009", descripcion: "Se encontró una columna de dirección pero no columnas de latitud/longitud.",
+      solucion: "Agrega columnas de latitud y longitud para permitir visualización en mapas.", link: QUALITY_LINKS.ERR009 });
+  }
+
+  if (sourceUrlFormatIssue) {
+    issues.push({ codigo: "ERR010", descripcion: sourceUrlFormatIssue,
+      solucion: "Si publicas por enlace (datos federados), el enlace debe apuntar directo a un archivo CSV, XLS, XLSX, JSON, KML, KMZ o ZIP -- nunca a una página, PDF, imagen o documento de Word.", link: QUALITY_LINKS.ERR010 });
+  }
+
+  const looksLikeDate = v => v instanceof Date || (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v));
+  const tieneFecha = fields.some(f => {
+    if (/fecha|a[nñ]o|vigencia|periodo/i.test(f)) return true;
+    const sample = loadedRows.slice(0, 30).map(r => r[f]).filter(v => v !== undefined && v !== null && v !== "");
+    return sample.length > 0 && sample.filter(looksLikeDate).length >= sample.length * 0.8;
+  });
+  if (!tieneFecha) {
+    issues.push({ codigo: "ERR011", descripcion: "No se identificó una columna de fecha, año o vigencia. Si este dataset se vuelve a publicar cada año o periodo por separado, datos.gov.co pide consolidarlos en un único conjunto.",
+      solucion: "Agrega una columna de fecha o vigencia (ej. DD/MM/AAAA) y consolida los datos históricos en un solo archivo que se actualice.", link: QUALITY_LINKS.ERR011 });
+  }
+
+  if (removedSummaryRowsCount > 0) {
+    issues.push({ codigo: "ERR016", descripcion: "Se detectaron " + removedSummaryRowsCount + " fila(s) que parecen totales o resúmenes (casi todas las columnas vacías salvo una), en vez de registros de detalle.",
+      solucion: "Los datos abiertos deben publicarse en su máximo nivel de detalle. Elimina las filas de 'TOTAL' o notas de fuente antes de publicar.", link: QUALITY_LINKS.ERR016 });
+  }
+
+  const sensiblePatterns = /nombre|apellido|c[eé]dula|documento|identificaci[oó]n|\bnit\b|tel[eé]fono|celular|correo|email|direcci[oó]n/i;
+  const idLikeName = /^(no\.?[_ ]?|num(ero)?[_ ]?|id[_ ]?|consecutivo|codigo|estrato)/i;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const cedulaRegex = /^\d{7,10}$/;
+  const flaggedFields = [];
+  const flaggedFieldNames = [];
+  fields.forEach(f => {
+    if (sensiblePatterns.test(f)) { flaggedFields.push(humanizeField(f) + " (nombre de columna sugiere dato personal)"); flaggedFieldNames.push(f); return; }
+    const sample = loadedRows.slice(0, 60).map(r => r[f]).filter(v => v !== undefined && v !== null && v !== "" && typeof v !== "object");
+    if (!sample.length) return;
+    const emailShare = sample.filter(v => emailRegex.test(String(v))).length / sample.length;
+    if (emailShare > 0.4) { flaggedFields.push(humanizeField(f) + " (contiene correos electrónicos)"); flaggedFieldNames.push(f); return; }
+    if (!idLikeName.test(f)) {
+      const cedulaShare = sample.filter(v => cedulaRegex.test(String(v).trim())).length / sample.length;
+      if (cedulaShare > 0.6) { flaggedFields.push(humanizeField(f) + " (parece contener números de documento de identidad)"); flaggedFieldNames.push(f); }
+    }
+  });
+  if (flaggedFields.length) {
+    issues.push({ codigo: "ERR018", descripcion: "Posibles datos personales o sensibles en: " + flaggedFields.join(", ") + ". Publicar esta información sin anonimizar puede comprometer la privacidad de las personas (Ley 1581 de 2012).",
+      solucion: "Elimina estas columnas del conjunto a publicar, o aplica técnicas de anonimización antes de subirlo.", link: QUALITY_LINKS.ERR018 });
+  }
+
+  const tipoInconsistente = [];
+  const tipoInconsistenteFieldNames = [];
+  fields.forEach(f => {
+    const sample = loadedRows.map(r => r[f]).filter(v => v !== undefined && v !== null && v !== "" && typeof v !== "object");
+    if (sample.length < 10) return;
+    const numericCount = sample.filter(v => v !== "" && !isNaN(Number(v))).length;
+    const numericShare = numericCount / sample.length;
+    if (numericShare > 0.6 && numericShare < 0.95) { tipoInconsistente.push(humanizeField(f)); tipoInconsistenteFieldNames.push(f); }
+  });
+  if (tipoInconsistente.length) {
+    issues.push({ codigo: "ERR019", descripcion: "Las columnas " + tipoInconsistente.slice(0, 5).join(", ") + " mezclan valores numéricos y de texto, lo que sugiere un tipo de dato inconsistente.",
+      solucion: "Revisa que cada columna tenga un único tipo de dato consistente en todas las filas.", link: QUALITY_LINKS.ERR019 });
+  }
+
+  const seen = new Set();
+  let duplicateCount = 0;
+  const duplicateRowIndexes = [];
+  loadedRows.forEach((r, idx) => {
+    const key = JSON.stringify(fields.map(f => r[f]));
+    if (seen.has(key)) { duplicateCount++; duplicateRowIndexes.push(idx); } else { seen.add(key); }
+  });
+  if (duplicateCount > 0) {
+    issues.push({ codigo: "ERR020", descripcion: "Se encontraron " + duplicateCount + " fila(s) duplicada(s) (misma información en todas las columnas).",
+      solucion: "Revisa y elimina los registros duplicados. Se puede usar Open Refine para identificarlos fácilmente.", link: QUALITY_LINKS.ERR020 });
+  }
+
+  if (datasetMeta.titulo && datasetMeta.titulo.trim()) {
+    const t = datasetMeta.titulo.trim();
+    const problemas = [];
+    if (/\b(19|20)\d{2}\b/.test(t)) problemas.push("no debe incluir el año o vigencia en el título");
+    if (t.length < 10) problemas.push("es demasiado corto/genérico");
+    if (/[^\w\sÁÉÍÓÚáéíóúÑñ.,()-]/.test(t)) problemas.push("contiene caracteres especiales");
+    if (problemas.length) {
+      issues.push({ codigo: "ERR001", descripcion: "El título propuesto (\"" + t + "\") " + problemas.join(" y ") + ".",
+        solucion: "Actualiza el título: claro, general, sin siglas ni vigencias.", link: QUALITY_LINKS.ERR001 });
+    }
+    const mandatoryNames = /registro de activos de informaci[oó]n|indice de informaci[oó]n clasificada|esquema de publicaci[oó]n|tabla.*retenci[oó]n documental/i;
+    if (mandatoryNames.test(t)) {
+      issues.push({ codigo: "ERR006", descripcion: "El título sugiere que este es uno de los conjuntos obligatorios por Ley 1712/2014 que ya NO deben publicarse por separado.",
+        solucion: "Consolida este dato con el esquema de federación por URL desde la sección de Transparencia del sitio institucional.", link: QUALITY_LINKS.ERR006 });
+    }
+  }
+  if (!datasetMeta.descripcion || !datasetMeta.descripcion.trim()) {
+    issues.push({ codigo: "ERR002", descripcion: "No se ha diligenciado una descripción general del conjunto de datos.",
+      solucion: "Completa la descripción general del dataset explicando qué contiene y para qué sirve.", link: QUALITY_LINKS.ERR002 });
+  }
+
+  const sinDescripcion = fields.filter(f => !(columnDescriptions[f] && columnDescriptions[f].trim()));
+  if (sinDescripcion.length) {
+    issues.push({ codigo: "ERR008_3", descripcion: sinDescripcion.length + " de " + fields.length + " columnas no tienen descripción: "
+      + sinDescripcion.slice(0, 6).map(humanizeField).join(", ") + (sinDescripcion.length > 6 ? "..." : "") + ".",
+      solucion: "Agrega una descripción clara a cada columna (formulario abajo) antes de subir la metadata a datos.gov.co.", link: QUALITY_LINKS.ERR008_3 });
+  }
+
+  lastAnalysis = {
+    fields,
+    emptyFieldNames: emptyCols.map(c => c.field),
+    personalFieldNames: flaggedFieldNames,
+    personalFieldReasons: flaggedFields,
+    mixedTypeFieldNames: tipoInconsistenteFieldNames,
+    duplicateRowIndexes,
+    issues,
+  };
+
+  renderResultado(issues, fields);
+}
+
+function renderResultado(issues, fields) {
+  const el = document.getElementById("resultado");
+  const verdictOk = issues.length === 0;
+
+  const rowsHtml = issues.map(i => `
+    <tr>
+      <td>${escapeHtml(currentFileName)}</td>
+      <td><span class="err-code">${i.codigo}</span></td>
+      <td>${escapeHtml(i.descripcion)}</td>
+      <td>${escapeHtml(i.solucion)}</td>
+      <td><a href="${i.link}" target="_blank" rel="noopener">Ver guía</a></td>
+    </tr>`).join("");
+
+  const manualHtml = MANUAL_CHECK_CODES.map(m => `<li><span class="err-code manual">${m.codigo}</span> ${escapeHtml(m.nota)}</li>`).join("");
+
+  const descFormHtml = fields.map(f => `
+    <div class="desc-row">
+      <label>${escapeHtml(humanizeField(f))}</label>
+      <input type="text" data-field="${escapeAttr(f)}" class="desc-input" placeholder="Qué representa esta columna..." value="${escapeAttr(columnDescriptions[f] || "")}">
+    </div>`).join("");
+
+  el.innerHTML = `
+    <div class="panel verdict-panel ${verdictOk ? "" : "has-issues"}">
+      <h2>${verdictOk ? "✓ No se detectaron errores automatizables" : "⚠ " + issues.length + " posible(s) problema(s) detectado(s)"}</h2>
+      <p class="verdict-sub">Verificación instantánea basada en el listado oficial de errores de calidad de datos.gov.co. Cubre 13 de los 22 códigos oficiales — los que se pueden revisar solo con el archivo. No reemplaza la revisión oficial del portal.</p>
+      ${issues.length ? `
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Conjunto de datos</th><th>Código</th><th>Descripción del error</th><th>Solución recomendada</th><th>Guía</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>` : ""}
+    </div>
+
+    <div class="panel">
+      <h2>Otros códigos que requieren revisión manual</h2>
+      <p style="font-size:12px;color:var(--text-muted)">No se pueden verificar solo con el archivo (requieren comparar con otros datasets ya publicados, la cuenta de usuario, etc.):</p>
+      <ul class="manual-list">${manualHtml}</ul>
+    </div>
+
+    <div class="panel">
+      <h2>Descargar el archivo con los errores marcados</h2>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Genera una copia de tu Excel con las celdas problemáticas resaltadas en color y una nota explicando cada error, más una hoja nueva con el resumen — para verlo directamente en Excel, no solo aquí.</p>
+      <button id="descargarExcelBtn" type="button">Descargar Excel con errores marcados</button>
+      <span id="excelStatus" style="font-size:12px;color:var(--text-muted);margin-left:10px"></span>
+    </div>
+
+    <div class="panel">
+      <h2>Descripciones de columnas (evita ERR008_3)</h2>
+      <div class="desc-grid">${descFormHtml}</div>
+      <button class="secondary" id="guardarDescripcionesBtn" type="button" style="margin-top:14px">Guardar y volver a verificar</button>
+    </div>
+  `;
+  document.getElementById("guardarDescripcionesBtn").addEventListener("click", () => {
+    document.querySelectorAll(".desc-input").forEach(inp => { columnDescriptions[inp.dataset.field] = inp.value; });
+    verificarCalidad();
+  });
+  document.getElementById("descargarExcelBtn").addEventListener("click", generarExcelAnotado);
+}
+
+/* =========================================================================
+   DESCARGAR EXCEL CON LOS ERRORES MARCADOS DIRECTAMENTE EN LAS CELDAS
+   =========================================================================
+   SheetJS (xlsx.js) en su version gratuita solo LEE con estilos; no puede
+   escribir colores ni notas en las celdas. Para eso se usa ExcelJS, que
+   si soporta relleno de color y comentarios al escribir un .xlsx nuevo.
+*/
+const FILL_EMPTY = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8CBCB" } };      // rojo suave: celda vacia (ERR007)
+const FILL_PERSONAL = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE0B3" } };   // naranja suave: dato personal (ERR018)
+const FILL_MIXED = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF3B0" } };      // amarillo: tipo inconsistente (ERR019)
+const FILL_DUP = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD6E4FF" } };        // azul suave: fila duplicada (ERR020)
+const FILL_SUMMARY_ROW = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E2E2" } }; // gris: fila de totales (ERR016)
+const FILL_HEADER = { type: "pattern", pattern: "solid", fgColor: { argb: "FF11233F" } };
+
+async function generarExcelAnotado() {
+  if (!lastAnalysis || !rawRows.length) { alert("Primero verifica la calidad del archivo."); return; }
+  if (!window.ExcelJS) { alert("La libreria ExcelJS no cargo. Verifica tu conexion e intenta de nuevo."); return; }
+  const excelStatus = document.getElementById("excelStatus");
+  const btn = document.getElementById("descargarExcelBtn");
+  btn.disabled = true;
+  excelStatus.textContent = "Generando archivo...";
+
+  try {
+    const { fields, emptyFieldNames, personalFieldNames, personalFieldReasons, mixedTypeFieldNames, issues } = lastAnalysis;
+    const wb = new ExcelJS.Workbook();
+
+    // ---- Hoja 1: Resumen de errores (misma tabla del reporte) ----
+    const resumen = wb.addWorksheet("Resumen de errores");
+    resumen.columns = [
+      { header: "Código", key: "codigo", width: 12 },
+      { header: "Descripción del error", key: "descripcion", width: 70 },
+      { header: "Solución recomendada", key: "solucion", width: 55 },
+      { header: "Guía de apoyo", key: "link", width: 45 },
+    ];
+    resumen.getRow(1).eachCell(c => { c.fill = FILL_HEADER; c.font = { color: { argb: "FFFFFFFF" }, bold: true }; });
+    issues.forEach(i => {
+      const row = resumen.addRow({ codigo: i.codigo, descripcion: i.descripcion, solucion: i.solucion, link: i.link });
+      row.getCell("descripcion").alignment = { wrapText: true, vertical: "top" };
+      row.getCell("solucion").alignment = { wrapText: true, vertical: "top" };
+      row.getCell("link").font = { color: { argb: "FF065A82" }, underline: true };
+    });
+    if (!issues.length) resumen.addRow({ codigo: "-", descripcion: "No se detectaron errores automatizables.", solucion: "", link: "" });
+
+    // ---- Hoja 2: Datos, con las filas ORIGINALES (incluye las que se limpiaron) y celdas marcadas ----
+    const datos = wb.addWorksheet("Datos");
+    datos.columns = fields.map(f => ({ header: humanizeField(f), key: f, width: 22 }));
+    datos.getRow(1).eachCell(c => { c.fill = FILL_HEADER; c.font = { color: { argb: "FFFFFFFF" }, bold: true }; });
+
+    // Marcar en el encabezado las columnas con datos personales
+    personalFieldNames.forEach(f => {
+      const col = datos.getColumn(f);
+      if (col) {
+        const headerCell = datos.getRow(1).getCell(col.number);
+        headerCell.fill = FILL_PERSONAL;
+        const reason = personalFieldReasons.find(r => r.toLowerCase().startsWith(humanizeField(f).toLowerCase())) || "posible dato personal";
+        headerCell.note = "ERR018 — " + reason + ". Revisa la Guia de Anonimizacion antes de publicar.";
+      }
+    });
+
+    const fieldCount = fields.length;
+    const seenKeys = new Map();
+
+    rawRows.forEach((rawRow) => {
+      const rowData = {};
+      fields.forEach(f => { rowData[f] = rawRow[f] instanceof Date ? rawRow[f] : (rawRow[f] === undefined ? "" : rawRow[f]); });
+      const row = datos.addRow(rowData);
+
+      const filledCount = fields.filter(f => rawRow[f] !== undefined && rawRow[f] !== null && rawRow[f] !== "").length;
+      const esFilaResumen = filledCount < fieldCount * 0.4;
+
+      if (esFilaResumen) {
+        row.eachCell({ includeEmpty: true }, c => { c.fill = FILL_SUMMARY_ROW; });
+        row.getCell(1).note = "ERR016 — Esta fila parece un total o resumen, no un registro de detalle.";
+        return;
+      }
+
+      // Duplicados: comparar contra lo ya visto (mismo criterio que verificarCalidad)
+      const key = JSON.stringify(fields.map(f => rawRow[f] instanceof Date ? rawRow[f].toISOString() : rawRow[f]));
+      const esDuplicada = seenKeys.has(key);
+      seenKeys.set(key, true);
+
+      fields.forEach((f, colIdx) => {
+        const cell = row.getCell(colIdx + 1);
+        const v = rawRow[f];
+        const isEmpty = v === undefined || v === null || String(v).trim() === "";
+        if (isEmpty && emptyFieldNames.includes(f)) {
+          cell.fill = FILL_EMPTY;
+          cell.note = "ERR007 — Celda vacía en una columna que debería estar completa.";
+        } else if (mixedTypeFieldNames.includes(f) && !isEmpty && isNaN(Number(v)) && !(v instanceof Date)) {
+          cell.fill = FILL_MIXED;
+          cell.note = "ERR019 — Valor no numérico en una columna mayormente numérica: \"" + v + "\".";
+        } else if (esDuplicada) {
+          cell.fill = FILL_DUP;
+        }
+      });
+      if (esDuplicada) row.getCell(1).note = ((row.getCell(1).note ? row.getCell(1).note + " | " : "") + "ERR020 — Fila duplicada (misma información que otra fila).");
+    });
+
+    datos.views = [{ state: "frozen", ySplit: 1 }];
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const baseName = currentFileName.replace(/\.[^.]+$/, "") || "dataset";
+    a.href = url;
+    a.download = baseName + "-errores-marcados.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    excelStatus.textContent = "Listo — revisa la hoja \"Datos\" (celdas resaltadas con notas) y \"Resumen de errores\".";
+  } catch (err) {
+    excelStatus.textContent = "No se pudo generar el Excel: " + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
