@@ -25,12 +25,21 @@ semana de agosto de 2026, en el marco de GovCamps 2026.
 
 ## En curso / pendiente
 
+- [ ] **Registrar el proyecto en https://herramientas.datos.gov.co/usos**
+      — requisito obligatorio de los términos del concurso, no solo
+      recomendado. Sin esto, el proyecto no avanza en la evaluación.
 - [ ] Conectar el webhook de n8n en producción (reemplazar el
-      `WEBHOOK_URL` de ejemplo por la URL real y activa).
+      `WEBHOOK_URL` de ejemplo por la URL real y activa) — crítico antes
+      de cualquier demo en vivo ante el jurado.
 - [ ] Instalar el microservicio de captura de imagen en el servidor
       definitivo (con proceso persistente vía `pm2` o `systemd`).
 - [ ] Poblar `datasets/catalogo.csv` con el inventario real de datasets
       del municipio.
+- [ ] Agregar capturas de pantalla reales en `docs/capturas/`,
+      `images/mockups/` e `images/banner/` — hoy están vacías.
+- [ ] Confirmar que el equipo cumple los requisitos administrativos del
+      concurso (mínimo una integrante mujer, perfil de ciencia de
+      datos/analítica) — esto no se resuelve en el repositorio.
 - [ ] Definir si se necesita backend propio (`backend/`) más allá de
       n8n, o si n8n cubre todas las necesidades de orquestación.
 - [ ] Diseñar los dashboards temáticos (`dashboards/`) para cada sector:
