@@ -1,652 +1,392 @@
+// Genera el workflow de n8n para el boton "Crear Infografia" del
+// Lienzo Ejecutivo. Ejecutar: node build-workflow.js
 const fs = require("fs");
 
 // =========================================================================
-// Codigo del nodo "Analizar dataset" — version para n8n (Node.js puro,
-// sin DOM) portada de la misma logica que ya corre en la consola web.
-// Recibe { rows: [...], datasetName, query } y devuelve KPIs, hallazgos
-// en texto y graficas agregadas listas para insertar en la plantilla HTML.
+// Codigo del nodo "Construir HTML de la infografia"
 // =========================================================================
-const analizarDatasetCode = `
-const input = $input.first().json;
-const rawRows = input.rows || [];
-const datasetName = input.datasetName || "Dataset";
-const query = input.query || "";
-
-function cleanRows(rows) {
-  if (!rows.length) return rows;
-  const fieldCount = Object.keys(rows[0]).length;
-  return rows.filter(r => {
-    const filled = Object.values(r).filter(v => v !== undefined && v !== null && v !== "").length;
-    return filled >= fieldCount * 0.4;
-  });
-}
-
-function humanizeField(field) {
-  return String(field).replace(/_/g, " ").split(" ")
-    .map(w => w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : w)
-    .join(" ");
-}
-
-function classifyDataset(name) {
-  const n = (name || "").toLowerCase();
-  const rules = [
-    { label: "Tramites", kws: ["tramite", "suit", "servicio al ciudadano"] },
-    { label: "Presupuesto y Finanzas", kws: ["presupuesto", "ejecucion", "gasto", "ingreso", "financ", "contratacion", "secop"] },
-    { label: "Demografia y Poblacion", kws: ["poblacion", "demograf", "censo", "habitantes"] },
-    { label: "Discapacidad", kws: ["discapacidad", "discapacitad"] },
-    { label: "Salud", kws: ["salud", "vacuna", "epidemio", "eps", "hospital", "morbilidad"] },
-    { label: "Educacion", kws: ["educacion", "colegio", "matricula", "escolar", "estudiante"] },
-    { label: "Seguridad", kws: ["seguridad", "delito", "crimen", "hurto", "violencia"] },
-    { label: "Movilidad", kws: ["movilidad", "transito", "transporte", "vehicular"] },
-    { label: "Ambiente", kws: ["ambiente", "ambiental", "residuo", "agua", "bosque", "deforest"] },
-    { label: "Agropecuario", kws: ["agricola", "agropecuario", "insumo", "cultivo", "cosecha"] },
-    { label: "Construccion e Infraestructura", kws: ["construccion", "infraestructura", "obra", "vial", "vias", "urbanistic"] },
-  ];
-  for (const r of rules) { if (r.kws.some(k => n.includes(k))) return r.label; }
-  return null;
-}
-
-function buildColumnDefs(rows) {
-  const fields = Object.keys(rows[0]).filter(f => !f.startsWith(":"));
-  const defs = [];
-  fields.forEach(field => {
-    const values = rows.map(r => r[field]).filter(v =>
-      v !== undefined && v !== null && v !== "" && (typeof v !== "object" || v instanceof Date)
-    );
-    if (values.length < rows.length * 0.5) return;
-
-    const isIdLike = /^(no\\.?[_ ]?|num(ero)?[_ ]?|id[_ ]?|consecutivo)/i.test(field);
-    const distinctRaw = new Set(values.map(String));
-
-    const looksLikeDate = v => v instanceof Date || (typeof v === "string" && /^\\d{4}-\\d{2}-\\d{2}/.test(v));
-    if (values.filter(looksLikeDate).length >= values.length * 0.9) {
-      const dateValues = values.map(v => v instanceof Date ? v : new Date(v)).filter(d => !isNaN(d.getTime()));
-      const years = Array.from(new Set(dateValues.map(d => d.getUTCFullYear()))).sort();
-      if (years.length >= 2) defs.push({ field, kind: "date", years });
-      return;
-    }
-
-    const allNumeric = values.every(v => v !== "" && !isNaN(Number(v)));
-    if (allNumeric) {
-      const nums = values.map(Number);
-      const allUnique = distinctRaw.size === values.length;
-      const noVariance = distinctRaw.size === 1;
-      if (isIdLike || noVariance || (allUnique && values.length > 15)) return;
-      defs.push({ field, kind: "numeric", min: Math.min(...nums), max: Math.max(...nums) });
-      return;
-    }
-
-    const distinct = Array.from(distinctRaw);
-    const avgLen = values.reduce((a, v) => a + String(v).length, 0) / values.length;
-    if (distinct.length >= 2 && distinct.length <= 25 && avgLen < 60) {
-      defs.push({ field, kind: "categorical", values: distinct.sort() });
-    }
-  });
-  const order = { categorical: 0, date: 1, numeric: 2 };
-  defs.sort((a, b) => order[a.kind] - order[b.kind]);
-  return defs.slice(0, 8);
-}
-
-function formatNum(n) { return Number(n).toLocaleString("es-CO"); }
-function formatCell(v) {
-  if (v === undefined || v === null) return "";
-  if (typeof v === "object") return JSON.stringify(v).slice(0, 40);
-  return String(v);
-}
-
-const filtered = cleanRows(rawRows);
-if (!filtered.length) {
-  return [{ json: { error: "El dataset no tiene filas utilizables tras la limpieza." } }];
-}
-
-const columnDefs = buildColumnDefs(filtered);
-const categoricalDefs = columnDefs.filter(d => d.kind === "categorical");
-const categoricalDef = categoricalDefs[0];
-const numericDefs = columnDefs.filter(d => d.kind === "numeric");
-const numericDef = numericDefs[0];
-const dateDef = columnDefs.find(d => d.kind === "date");
-const labelField = (categoricalDef && categoricalDef.field) || (columnDefs[0] && columnDefs[0].field) || Object.keys(filtered[0])[0];
-
-const displayFields = [];
-if (labelField) displayFields.push(labelField);
-if (numericDef && numericDef.field !== labelField) displayFields.push(numericDef.field);
-columnDefs.forEach(d => { if (!displayFields.includes(d.field) && displayFields.length < 6) displayFields.push(d.field); });
-
-const insights = [];
-insights.push("Se analizaron " + filtered.length.toLocaleString("es-CO") + " registros en total.");
-
-const stats = [{ label: "Total de registros", value: filtered.length.toLocaleString("es-CO") }];
-if (numericDef) {
-  const nums = filtered.map(r => Number(r[numericDef.field])).filter(n => !isNaN(n));
-  const isRateLike = /edad|age|porcentaje|percent|tasa|rate|promedio|indice|índice/i.test(numericDef.field);
-  if (nums.length) {
-    const sum = nums.reduce((a, b) => a + b, 0);
-    const avg = sum / nums.length;
-    if (!isRateLike) stats.push({ label: "Suma de " + humanizeField(numericDef.field), value: formatNum(Math.round(sum)) });
-    stats.push({ label: "Promedio de " + humanizeField(numericDef.field), value: formatNum(Math.round(avg)) });
-    stats.push({ label: "Maximo de " + humanizeField(numericDef.field), value: formatNum(Math.max(...nums)) });
-    insights.push("El promedio de " + humanizeField(numericDef.field) + " es " + formatNum(Math.round(avg)) + ".");
-  }
-} else if (categoricalDef) {
-  stats.push({ label: "Categorias distintas en " + humanizeField(categoricalDef.field), value: String(new Set(filtered.map(r => r[categoricalDef.field])).size) });
-}
-
-let yearCounts = null;
-if (dateDef) {
-  yearCounts = {};
-  filtered.forEach(r => {
-    const d = r[dateDef.field] instanceof Date ? r[dateDef.field] : new Date(r[dateDef.field]);
-    if (!isNaN(d.getTime())) { const y = d.getUTCFullYear(); yearCounts[y] = (yearCounts[y] || 0) + 1; }
-  });
-  const years = Object.keys(yearCounts).map(Number).sort((a, b) => a - b);
-  if (years.length >= 2) {
-    const first = yearCounts[years[0]], last = yearCounts[years[years.length - 1]];
-    const pct = first ? Math.round(((last - first) / first) * 100) : 0;
-    stats.push({ label: years[0] + " -> " + years[years.length - 1], value: first + " -> " + last + " (" + (pct >= 0 ? "+" : "") + pct + "%)" });
-    insights.push("Entre " + years[0] + " y " + years[years.length - 1] + ", los registros " + (pct >= 0 ? "aumentaron" : "disminuyeron") + " " + Math.abs(pct) + "%.");
-  }
-}
-
-const charts = [];
-categoricalDefs.forEach(def => {
-  const groups = {};
-  filtered.forEach(r => { groups[String(r[def.field] ?? "Sin dato")] = (groups[String(r[def.field] ?? "Sin dato")] || 0) + 1; });
-  const entries = Object.entries(groups).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  if (entries.length < 2) return;
-  charts.push({ type: entries.length <= 6 ? "donut" : "bar", title: "Cantidad de registros por " + humanizeField(def.field), labels: entries.map(e => e[0]), values: entries.map(e => e[1]) });
-  const total = entries.reduce((a, e) => a + e[1], 0);
-  const topShare = Math.round((entries[0][1] / total) * 100);
-  insights.push("En " + humanizeField(def.field) + ", la categoria predominante es \\"" + entries[0][0] + "\\" con " + topShare + "% del total.");
-});
-
-if (dateDef && yearCounts) {
-  const years = Object.keys(yearCounts).sort();
-  if (years.length >= 2) charts.push({ type: "line", title: "Tendencia de registros por año", labels: years, values: years.map(y => yearCounts[y]) });
-}
-
-const result = {
-  datasetName,
-  query,
-  category: classifyDataset(datasetName),
-  totalRows: filtered.length,
-  stats,
-  insights: insights.slice(0, 6),
-  charts: charts.slice(0, 8),
-  columns: displayFields.map(humanizeField),
-  rows: filtered.slice(0, 50).map(r => displayFields.map(f => formatCell(r[f])))
-};
-
-return [{ json: result }];
-`.trim();
-
-// =========================================================================
-// Codigo del nodo "Preparar prompt de imagen" — decide que ilustracion
-// tematica pedirle al modelo de imagenes segun la categoria detectada
-// del dataset (salud -> doctor, educacion -> maestro, etc).
-// =========================================================================
-const prepararPromptImagenCode = `
-const analysis = $input.first().json;
-const rawCategory = analysis.category || "";
-const category = rawCategory.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "");
-
-const styleBase = "professional flat vector illustration, standing confidently, friendly expression, municipal government branding, navy blue and green color palette, simple clean background, no text, no logos";
-
-const promptsByCategory = {
-  "Salud": "a friendly doctor wearing a white coat and a stethoscope, " + styleBase,
-  "Educacion": "a friendly teacher holding a stack of books, " + styleBase,
-  "Tramites": "a friendly civil servant holding a folder and a clipboard, " + styleBase,
-  "Presupuesto y Finanzas": "a financial analyst holding a report with a bar chart, " + styleBase,
-  "Demografia y Poblacion": "a small diverse group of community members standing together, " + styleBase,
-  "Discapacidad": "an inclusive scene with a person using a wheelchair next to a companion, warm and accessible, " + styleBase,
-  "Seguridad": "a friendly police officer, " + styleBase,
-  "Movilidad": "a transit engineer standing next to a bus and a bicycle, " + styleBase,
-  "Ambiente": "a park ranger planting a tree, " + styleBase,
-  "Agropecuario": "a farmer holding a basket of fresh produce, " + styleBase,
-  "Construccion e Infraestructura": "a civil engineer wearing a hard hat holding blueprints, " + styleBase,
-};
-
-const defaultPrompt = "a friendly municipal government employee holding a laptop and documents, " + styleBase;
-const imagePrompt = promptsByCategory[category] || defaultPrompt;
-
-return [{ json: { imagePrompt } }];
-`.trim();
-
-// el texto que redacto el agente de IA, y arma el HTML final que se le
-// manda al servicio de captura de imagen.
-// =========================================================================
+// Recibe { titulo, kpis: [{nombre, valor}], graficos: [{titulo, top5: [{label, value}]}], imageBase64? }
+// Los KPIs/graficos siguen siendo exactamente lo que ya envia el boton
+// "Crear Infografia" -- ese contrato no cambia. Lo nuevo es imageBase64:
+// una ilustracion DECORATIVA elegida por un Agente de IA segun el tema
+// del lienzo. Nunca se le pide al modelo de imagen que dibuje cifras --
+// esas siempre vienen de aqui, de este codigo determinista.
 const construirHtmlCode = `
-let analysis;
-try { analysis = $('Usar analisis del cliente').first().json; } catch (e) { analysis = null; }
-if (!analysis || !Object.keys(analysis).length) { analysis = $('Analizar dataset').first().json; }
+const body = $input.first().json;
+const titulo = body.titulo || "Informe Ejecutivo";
+const kpis = Array.isArray(body.kpis) ? body.kpis : [];
+const graficos = Array.isArray(body.graficos) ? body.graficos : [];
+const imageBase64 = body.imageBase64 || null;
 
-let aiText = "";
-try {
-  const aiRaw = $('Agente IA (redacta narrativa)').first().json;
-  aiText = aiRaw.output || (aiRaw.content && aiRaw.content[0] && aiRaw.content[0].text) || (aiRaw.choices && aiRaw.choices[0] && aiRaw.choices[0].message.content) || aiRaw.text || "";
-} catch (e) { aiText = ""; }
-
-let aiParsed = {};
-try { aiParsed = JSON.parse(aiText); } catch (e) { aiParsed = { titulo: analysis.datasetName, resumen: aiText.slice(0, 400) }; }
-
-const titulo = aiParsed.titulo || analysis.datasetName;
-const resumen = aiParsed.resumen || (analysis.insights || []).join(" ");
-
-let imageBase64 = "";
-try {
-  const imgRaw = $('Generar imagen IA').first().json;
-  imageBase64 = (imgRaw.data && imgRaw.data[0] && imgRaw.data[0].b64_json) || "";
-} catch (e) { imageBase64 = ""; }
-
-function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-
-// Mismo mapeo categoria -> color que usa la consola (CATEGORY_THEME), para
-// que las graficas generadas aqui combinen con el resto del sistema.
-const THEME_COLORS = {
-  "Salud": "#D85A30",
-  "Educacion": "#1C7293",
-  "Tramites": "#065A82",
-  "Presupuesto y Finanzas": "#2E8B57",
-  "Demografia y Poblacion": "#7F77DD",
-  "Discapacidad": "#D4537E",
-  "Seguridad": "#21295C",
-  "Movilidad": "#2E6DA4",
-  "Ambiente": "#639922",
-  "Agropecuario": "#854F0B",
-  "Construccion e Infraestructura": "#5B6B7A",
+// Paleta de categorias, rotando -- misma logica que ya se uso en el
+// generador de infografias de Rosal BI: colores + icono por tarjeta,
+// nunca depende de un modelo de IA para dibujar cifras.
+const PALETTE = [
+  { color: "#0EA5E9", bg: "#E0F2FE", icon: "chart" },   // sky
+  { color: "#16A34A", bg: "#DCFCE7", icon: "leaf" },     // green
+  { color: "#9333EA", bg: "#F3E8FF", icon: "people" },   // purple
+  { color: "#DC2626", bg: "#FEE2E2", icon: "shield" },   // red
+  { color: "#D97706", bg: "#FEF3C7", icon: "star" },     // amber
+  { color: "#0F172A", bg: "#E2E8F0", icon: "doc" },      // slate
+];
+const ICONS = {
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20v-4" stroke-width="2.4" stroke-linecap="round"/>',
+  leaf: '<path d="M5 20c9 0 14-6 14-15-9 0-14 6-14 15Z"/><path d="M5 20c2-6 6-10 12-13" stroke-width="1.6" fill="none"/>',
+  people: '<circle cx="9" cy="8" r="3.4"/><path d="M3 20c0-3.6 2.7-6.4 6-6.4s6 2.8 6 6.4" /><circle cx="17" cy="9" r="2.6" fill-opacity="0.6"/>',
+  shield: '<path d="M12 3 5 6v6c0 5 3.5 8 7 9 3.5-1 7-4 7-9V6l-7-3Z"/>',
+  star: '<path d="M12 2l2.9 6.6 7.1.6-5.4 4.7L18.2 21 12 17.1 5.8 21l1.6-7.1L2 9.2l7.1-.6L12 2Z"/>',
+  doc: '<path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M15 3v5h5" fill="none" stroke-width="1.6"/>',
 };
-const normalizedCategory = (analysis.category || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-const themeColor = THEME_COLORS[normalizedCategory] || "#11233F";
-function shade(hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
-  const r = Math.min(255, Math.max(0, (n >> 16) + amt));
-  const g = Math.min(255, Math.max(0, ((n >> 8) & 0xff) + amt));
-  const b = Math.min(255, Math.max(0, (n & 0xff) + amt));
-  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-}
 
-// -------------------------------------------------------------------------
-// Escoge entre 4 y 7 bloques visuales en total, priorizando hasta 3
-// tarjetas de estadisticas y llenando el resto con graficas reales.
-// Si hay menos de 4 disponibles, se muestran los que existan (no se
-// inventan datos para rellenar).
-// -------------------------------------------------------------------------
-const MAX_BLOQUES = 7;
-const statsToShow = (analysis.stats || []).slice(0, 3);
-const chartSlots = Math.max(0, MAX_BLOQUES - statsToShow.length);
-const chartsToShow = (analysis.charts || []).slice(0, chartSlots);
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
-const statBlocksHtml = statsToShow.map(function(s) {
-  return '<div class="block stat-block">'
-    + '<div class="stat-label">' + esc(s.label) + '</div>'
-    + '<div class="stat-value" style="color:' + themeColor + '">' + esc(s.value) + '</div></div>';
+const kpiCardsHtml = kpis.map((k, i) => {
+  const theme = PALETTE[i % PALETTE.length];
+  return \`
+    <div style="background:\${theme.bg};border-radius:14px;padding:18px 20px;flex:1;min-width:180px">
+      <div style="width:38px;height:38px;border-radius:10px;background:\${theme.color};display:flex;align-items:center;justify-content:center;margin-bottom:10px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff">\${ICONS[theme.icon]}</svg>
+      </div>
+      <p style="font-size:11px;font-weight:700;color:\${theme.color};text-transform:uppercase;letter-spacing:.04em;margin:0 0 4px">\${esc(k.nombre)}</p>
+      <p style="font-size:26px;font-weight:800;color:#0F172A;margin:0">\${esc(k.valor)}</p>
+    </div>\`;
 }).join("");
 
-const chartBlocksHtml = chartsToShow.map(function(c, i) {
-  return '<div class="block chart-block">'
-    + '<p class="block-title">' + esc(c.title) + '</p>'
-    + '<canvas id="chart' + i + '"></canvas></div>';
+const graficoCardsHtml = graficos.map((g, i) => {
+  const theme = PALETTE[(i + 1) % PALETTE.length];
+  const top5 = Array.isArray(g.top5) ? g.top5 : [];
+  const max = Math.max(1, ...top5.map(d => Number(d.value) || 0));
+  const filas = top5.map(d => {
+    const pct = Math.round((Number(d.value) || 0) / max * 100);
+    return \`
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;color:#334155;margin-bottom:3px">
+          <span>\${esc(d.label)}</span><span style="font-weight:700">\${esc(Math.round(d.value).toLocaleString("es-CO"))}</span>
+        </div>
+        <div style="background:#E2E8F0;border-radius:5px;height:8px">
+          <div style="background:\${theme.color};width:\${pct}%;height:8px;border-radius:5px"></div>
+        </div>
+      </div>\`;
+  }).join("");
+  return \`
+    <div style="background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:18px 20px">
+      <p style="font-size:13.5px;font-weight:700;color:#0F172A;margin:0 0 12px">\${esc(g.titulo)}</p>
+      \${filas}
+    </div>\`;
 }).join("");
 
-const chartScripts = chartsToShow.map(function(c, i) {
-  const isDonut = c.type === "donut";
-  const isLine = c.type === "line";
-  const isGrouped = c.type === "grouped-bar";
-  let datasets;
-  if (isGrouped) {
-    const palette = [themeColor, shade(themeColor, 60), shade(themeColor, -40), shade(themeColor, 100)];
-    datasets = JSON.stringify((c.series || []).map(function(s, j) {
-      return { label: s.name, data: s.values, backgroundColor: palette[j % palette.length] };
-    }));
-  } else {
-    const palette = [0, 40, -30, 70, -55, 90, -15, 110].map(function(d) { return shade(themeColor, d); });
-    datasets = JSON.stringify([{
-      data: c.values,
-      backgroundColor: isDonut ? palette : themeColor,
-      borderColor: isLine ? themeColor : "#fff",
-      borderWidth: isDonut ? 2 : (isLine ? 2 : 0),
-      fill: isLine,
-      tension: isLine ? 0.3 : 0
-    }]);
-  }
-  const chartType = isDonut ? "doughnut" : (isLine ? "line" : "bar");
-  return "new Chart(document.getElementById('chart" + i + "'), { type: '" + chartType + "', "
-    + "data: { labels: " + JSON.stringify(c.labels) + ", datasets: " + datasets + " }, "
-    + "options: { responsive: false, animation: false, plugins: { legend: { display: " + (isDonut || isGrouped) + ", position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }, "
-    + "scales: " + (isDonut ? "{}" : "{ y: { beginAtZero: true } }") + " } });";
-}).join("\\n");
+const datosRapidosHtml = kpis.slice(0, 5).map((k, i) => {
+  const theme = PALETTE[i % PALETTE.length];
+  return \`
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:150px">
+      <div style="width:34px;height:34px;border-radius:50%;background:\${theme.color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff">\${ICONS[theme.icon]}</svg>
+      </div>
+      <div>
+        <p style="font-size:15px;font-weight:800;color:#0F172A;margin:0">\${esc(k.valor)}</p>
+        <p style="font-size:10px;color:#64748B;text-transform:uppercase;margin:0">\${esc(k.nombre)}</p>
+      </div>
+    </div>\`;
+}).join("");
 
-const imageHtml = imageBase64
-  ? '<img src="data:image/png;base64,' + imageBase64 + '" class="hero-img" alt="">'
-  : '<div class="hero-img hero-img-fallback"></div>';
+// El header lleva la ilustracion de IA (si llego) como textura de fondo,
+// atenuada detras de un degradado -- nunca reemplaza el titulo ni carga
+// cifras, solo le da ambiente visual. Si el Agente/imagen fallan, el
+// header sigue viendose bien con el degradado solo (nunca se cae el flujo
+// por culpa de la parte decorativa).
+const headerBgImage = imageBase64
+  ? \`<img src="data:image/png;base64,\${imageBase64}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.32" />\`
+  : "";
 
-const html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
-  + '<style>'
-  + "body{font-family:'Segoe UI',Arial,sans-serif;background:#F3F5F7;margin:0;padding:0}"
-  + '.wrap{width:1080px;padding:40px}'
-  + 'header{border-radius:16px;padding:32px;margin-bottom:24px;display:flex;gap:28px;align-items:center}'
-  + '.hero-img{width:170px;height:170px;border-radius:16px;object-fit:cover;flex-shrink:0;background:rgba(255,255,255,.2)}'
-  + '.hero-text{color:#fff}'
-  + '.badge{display:inline-block;background:rgba(255,255,255,.22);color:#fff;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin:0 0 12px}'
-  + '.hero-text h1{font-size:28px;margin:0 0 10px;line-height:1.2}'
-  + '.hero-text p{font-size:14px;color:rgba(255,255,255,.85);line-height:1.5;margin:0;max-width:720px}'
-  + '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}'
-  + '.block{background:#fff;border-radius:12px;padding:18px 20px;border:1px solid #E2E6EA}'
-  + '.stat-block{background:#F3F5F7;border:none;display:flex;flex-direction:column;justify-content:center}'
-  + '.stat-label{font-size:12px;color:#5B6B7A;margin-bottom:6px}'
-  + '.stat-value{font-size:26px;font-weight:700}'
-  + '.block-title{font-size:12.5px;font-weight:600;color:#11233F;margin:0 0 10px;text-align:center}'
-  + '.chart-block canvas{max-height:170px}'
-  + 'footer{margin-top:22px;font-size:11px;color:#8B95A3}'
-  + '</style></head><body><div class="wrap">'
-  + '<header style="background:' + themeColor + '">'
-  + imageHtml
-  + '<div class="hero-text">'
-  + '<p class="badge">' + esc(analysis.category || "Datos Abiertos") + ' &middot; El Rosal</p>'
-  + '<h1>' + esc(titulo) + '</h1>'
-  + '<p>' + esc(resumen) + '</p>'
-  + '</div></header>'
-  + '<div class="grid">' + statBlocksHtml + chartBlocksHtml + '</div>'
-  + '<footer>Generado automaticamente a partir de ' + esc(analysis.datasetName) + ' &middot; ' + analysis.totalRows + ' registros analizados.</footer>'
-  + '</div>'
-  + '<script>' + chartScripts + '</' + 'script>'
-  + '</body></html>';
+const html = \`
+<div style="width:900px;background:#F8FAFC;font-family:'Segoe UI',Arial,sans-serif;padding:0">
+  <div style="position:relative;background:linear-gradient(135deg,#0F172A,#1E3A5F);padding:44px 50px 36px;text-align:center;overflow:hidden">
+    \${headerBgImage}
+    <div style="position:relative">
+      <p style="color:#7DD3FC;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 10px">Informe generado automaticamente</p>
+      <h1 style="color:#fff;font-size:34px;font-weight:800;margin:0;line-height:1.2">\${esc(titulo.toUpperCase())}</h1>
+    </div>
+  </div>
 
-return [{ json: { html: html, analysis: analysis } }];
-`.trim();
+  <div style="padding:34px 50px">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:28px">\${kpiCardsHtml}</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:28px">\${graficoCardsHtml}</div>
+
+    <div style="background:#0F172A;border-radius:14px;padding:20px 24px">
+      <p style="color:#94A3B8;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:0 0 14px;text-align:center">Datos Rapidos</p>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;justify-content:center">\${datosRapidosHtml}</div>
+    </div>
+
+    <p style="text-align:center;font-size:10px;color:#94A3B8;margin-top:24px">Generado automaticamente | Concurso Datos al Ecosistema 2026</p>
+  </div>
+</div>
+\`;
+
+return [{ json: { html, titulo } }];
+`;
+
+// =========================================================================
+// Codigo del nodo "Preparar datos para el Agente"
+// =========================================================================
+// Le da al Agente un resumen corto y legible (no el JSON crudo completo)
+// para que el prompt que escriba sea mas preciso.
+const prepararResumenCode = `
+const body = $input.first().json;
+const titulo = body.titulo || "";
+const kpisResumen = (body.kpis || []).map(k => k.nombre).slice(0, 6).join(", ");
+const graficosResumen = (body.graficos || []).map(g => g.titulo).slice(0, 4).join(", ");
+return [{ json: { ...body, resumenParaAgente: "Titulo: " + titulo + ". KPIs: " + kpisResumen + ". Graficos: " + graficosResumen } }];
+`;
 
 const workflow = {
-  name: "Asistente El Rosal - Resumen Visual",
+  name: "Lienzo Ejecutivo - Crear Infografia",
   nodes: [
     {
       id: "webhook1",
       name: "Webhook",
       type: "n8n-nodes-base.webhook",
       typeVersion: 2,
-      position: [-200, 300],
+      position: [180, 340],
+      webhookId: "crear-infografia-lienzo",
       parameters: {
+        path: "crear-infografia",
         httpMethod: "POST",
-        path: "asistente-el-rosal-imagen",
         responseMode: "responseNode",
         options: {},
       },
     },
     {
-      id: "ifModo",
-      name: "Viene ya analizado (infografia)?",
-      type: "n8n-nodes-base.if",
-      typeVersion: 2,
-      position: [-100, 300],
-      parameters: {
-        conditions: {
-          options: { caseSensitive: true, leftValue: "", typeValidation: "loose" },
-          conditions: [
-            {
-              leftValue: "={{ $json.body.mode }}",
-              rightValue: "infografia",
-              operator: { type: "string", operation: "equals" },
-            },
-          ],
-          combinator: "and",
-        },
-        options: {},
-      },
-      notes: "Si la consola ya consolido y totalizo los datos (boton Generar infografia), se salta el analisis y va directo a redactar + generar la imagen.",
-    },
-    {
-      id: "codeModoDirecto",
-      name: "Usar analisis del cliente",
+      id: "code0",
+      name: "Preparar datos para el Agente",
       type: "n8n-nodes-base.code",
       typeVersion: 2,
-      position: [120, 220],
-      parameters: {
-        mode: "runOnceForAllItems",
-        jsCode:
-          "const body = $('Webhook').first().json.body;\nreturn [{ json: body.analysis || {} }];",
-      },
-    },
-    {
-      id: "if1",
-      name: "Tiene datasetId?",
-      type: "n8n-nodes-base.if",
-      typeVersion: 2,
-      position: [120, 400],
-      parameters: {
-        conditions: {
-          options: { caseSensitive: true, leftValue: "", typeValidation: "loose" },
-          conditions: [
-            {
-              leftValue: "={{ $json.body.datasetId }}",
-              rightValue: "",
-              operator: { type: "string", operation: "notEmpty" },
-            },
-          ],
-          combinator: "and",
-        },
-        options: {},
-      },
-    },
-    {
-      id: "http1",
-      name: "Traer datos de datos.gov.co",
-      type: "n8n-nodes-base.httpRequest",
-      typeVersion: 4.2,
-      position: [280, 180],
-      parameters: {
-        url: "=https://www.datos.gov.co/resource/{{ $json.body.datasetId }}.json",
-        qs: { parameters: [{ name: "$limit", value: "1000" }] },
-        options: {},
-      },
-    },
-    {
-      id: "set1",
-      name: "Normalizar filas (Socrata)",
-      type: "n8n-nodes-base.code",
-      typeVersion: 2,
-      position: [520, 180],
-      parameters: {
-        mode: "runOnceForAllItems",
-        jsCode:
-          "const rows = $input.all().map(i => i.json);\nconst trigger = $('Webhook').first().json.body;\nreturn [{ json: { rows, datasetName: trigger.datasetName || trigger.datasetId, query: trigger.query || '' } }];",
-      },
-    },
-    {
-      id: "set2",
-      name: "Normalizar filas (manual)",
-      type: "n8n-nodes-base.code",
-      typeVersion: 2,
-      position: [280, 420],
-      parameters: {
-        mode: "runOnceForAllItems",
-        jsCode:
-          "const body = $('Webhook').first().json.body;\nreturn [{ json: { rows: body.manualData || [], datasetName: body.datasetName || 'Dataset cargado manualmente', query: body.query || '' } }];",
-      },
-    },
-    {
-      id: "code1",
-      name: "Analizar dataset",
-      type: "n8n-nodes-base.code",
-      typeVersion: 2,
-      position: [760, 300],
-      parameters: { mode: "runOnceForAllItems", jsCode: analizarDatasetCode },
+      position: [420, 220],
+      parameters: { mode: "runOnceForAllItems", jsCode: prepararResumenCode },
     },
     {
       id: "agent1",
-      name: "Agente IA (redacta narrativa)",
+      name: "Agente IA (elige ilustracion)",
       type: "@n8n/n8n-nodes-langchain.agent",
       typeVersion: 1.7,
-      position: [1000, 140],
+      position: [660, 220],
       parameters: {
         promptType: "define",
-        text: "={{ 'Pregunta del ciudadano: ' + $json.query + '. Analisis de datos (unica fuente de cifras permitida): ' + JSON.stringify($json) }}",
+        text: "={{ $json.resumenParaAgente }}",
         options: {
           systemMessage:
-            'Eres un redactor de informes de gestion publica para la Alcaldia de El Rosal. A partir del analisis de datos que recibes, responde SOLO con un JSON valido de la forma {"titulo": string, "resumen": string de maximo 3 frases}. No inventes cifras que no esten en los datos recibidos.',
+            'Eres un director de arte para informes de gestion publica. A partir del resumen del panel que recibes, responde SOLO con un JSON valido de la forma {"prompt": string}. El prompt debe estar en ingles, describir una ilustracion decorativa de fondo (flat vector illustration, professional, navy and sky-blue color palette, no text, no numbers, no logos, no readable words, abstract or thematic scene related to the topic) para usar como textura detras de un titulo -- nunca debe pedir que la imagen incluya cifras, tablas, graficas ni texto legible.',
         },
       },
-      notes: "Este nodo solo redacta texto (titulo + resumen) -- los numeros y graficas siempre vienen del analisis deterministico, nunca de aqui. Conecta el modelo de chat que prefieras (OpenAI, Gemini, Anthropic...) al puerto inferior 'Chat Model'; si el modelo no tiene credencial valida, n8n marca este nodo en rojo con el error al ejecutar.",
+      notes: "Elige el tema/estilo de la ilustracion decorativa segun el titulo y los KPIs del lienzo. Nunca decide ni redacta las cifras -- esas siempre vienen del Code 'Construir HTML'. Si este nodo o el de imagen fallan, el header simplemente se queda con el degradado solo (ver 'Construir HTML').",
     },
     {
       id: "chatModel1",
       name: "Modelo de Chat (OpenAI)",
       type: "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       typeVersion: 1,
-      position: [1000, 320],
-      parameters: {
-        model: "gpt-4o-mini",
-        options: {},
-      },
+      position: [660, 400],
+      parameters: { model: "gpt-4o-mini", options: {} },
       credentials: { openAiApi: { id: "", name: "OpenAI account" } },
-      notes: "Cambialo por 'Google Gemini Chat Model' o 'Anthropic Chat Model' si prefieres otro proveedor -- solo borralo y conecta el nuevo al mismo puerto 'Chat Model' del Agente, el resto del flujo no cambia.",
+      notes: "Cambialo por 'Google Gemini Chat Model' o 'Anthropic Chat Model' si prefieres otro proveedor -- solo reconectalo al mismo puerto 'Chat Model' del Agente.",
     },
     {
-      id: "code3",
-      name: "Preparar prompt de imagen",
-      type: "n8n-nodes-base.code",
-      typeVersion: 2,
-      position: [1000, 460],
-      parameters: { mode: "runOnceForAllItems", jsCode: prepararPromptImagenCode },
-    },
-    {
-      id: "http4",
-      name: "Generar imagen IA",
+      id: "http2",
+      name: "Generar imagen IA (OpenAI)",
       type: "n8n-nodes-base.httpRequest",
       typeVersion: 4.2,
-      position: [1240, 460],
+      position: [900, 160],
       parameters: {
         method: "POST",
         url: "https://api.openai.com/v1/images/generations",
         authentication: "genericCredentialType",
         genericAuthType: "httpHeaderAuth",
         sendHeaders: true,
-        headerParameters: {
-          parameters: [
-            { name: "content-type", value: "application/json" },
-          ],
-        },
+        headerParameters: { parameters: [{ name: "content-type", value: "application/json" }] },
         sendBody: true,
         specifyBody: "json",
-        jsonBody:
-          "={{ JSON.stringify({ model: 'dall-e-3', prompt: $json.imagePrompt, n: 1, size: '1024x1024', response_format: 'b64_json' }) }}",
+        jsonBody: "={{ JSON.stringify({ model: 'dall-e-3', prompt: JSON.parse($json.output).prompt, n: 1, size: '1792x1024', response_format: 'b64_json' }) }}",
         options: {},
       },
       credentials: { httpHeaderAuth: { id: "", name: "OpenAI API Key (Authorization)" } },
-      notes: "Requiere una credencial 'Header Auth' llamada Authorization con valor 'Bearer sk-TU-LLAVE' (incluye la palabra Bearer). Solo genera la ilustracion decorativa (sin texto ni cifras); puedes cambiar por otro proveedor de imagenes (Flux, Stability) manteniendo el mismo formato de salida b64_json.",
-    },
-    {
-      id: "merge1",
-      name: "Combinar narrativa e imagen",
-      type: "n8n-nodes-base.merge",
-      typeVersion: 3,
-      position: [1480, 300],
-      parameters: { mode: "combine", combinationMode: "multiplex" },
+      notes: "Requiere una credencial 'Header Auth' llamada Authorization con valor 'Bearer sk-TU-LLAVE'.",
     },
     {
       id: "code2",
-      name: "Construir HTML",
+      name: "Normalizar imagen (OpenAI)",
       type: "n8n-nodes-base.code",
       typeVersion: 2,
-      position: [1720, 300],
-      parameters: { mode: "runOnceForAllItems", jsCode: construirHtmlCode },
+      position: [1020, 160],
+      parameters: {
+        mode: "runOnceForAllItems",
+        jsCode: "const body = $input.first().json;\nconst imageBase64 = body.data && body.data[0] ? body.data[0].b64_json : null;\nreturn [{ json: { imageBase64 } }];",
+      },
+      notes: "IMPORTANTE: la respuesta cruda de OpenAI viene en data[0].b64_json, no en un campo 'imageBase64' -- este nodo la extrae al formato que espera 'Construir HTML'. Sin este paso, la imagen nunca llegaba (bug real que se corrigio aqui).",
     },
     {
       id: "http3",
-      name: "HTML a imagen",
+      name: "Generar imagen IA (Gemini) [alternativa]",
       type: "n8n-nodes-base.httpRequest",
       typeVersion: 4.2,
-      position: [1960, 300],
+      position: [900, 300],
+      disabled: true,
+      parameters: {
+        method: "POST",
+        url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent",
+        authentication: "genericCredentialType",
+        genericAuthType: "httpHeaderAuth",
+        sendHeaders: true,
+        headerParameters: { parameters: [{ name: "content-type", value: "application/json" }] },
+        sendBody: true,
+        specifyBody: "json",
+        jsonBody: "={{ JSON.stringify({ contents: { role: 'user', parts: [{ text: JSON.parse($json.output).prompt }] }, generationConfig: { responseModalities: ['TEXT','IMAGE'], imageConfig: { aspectRatio: '16:9' } } }) }}",
+        options: {},
+      },
+      credentials: { httpHeaderAuth: { id: "", name: "Gemini API Key (x-goog-api-key)" } },
+      notes: "ALTERNATIVA a OpenAI -- endpoint HTTPS distinto (Google Gemini nativo, no hay un nodo dedicado 'Gemini Imagen' en n8n, se hace por HTTP Request igual que con OpenAI). Credencial 'Header Auth': nombre del header 'x-goog-api-key', valor la API key de Google AI Studio directa (sin 'Bearer'). Modelo gemini-3.1-flash-image vigente a julio 2026 -- si esta deprecado cuando lo uses, revisa el modelo recomendado actual en ai.google.dev/gemini-api/docs/models. Para activar esta alternativa: desactiva 'Generar imagen IA (OpenAI)', activa este nodo y 'Normalizar imagen (Gemini)', y reconecta el Agente hacia aca en vez de hacia OpenAI.",
+    },
+    {
+      id: "code3",
+      name: "Normalizar imagen (Gemini)",
+      type: "n8n-nodes-base.code",
+      typeVersion: 2,
+      position: [1020, 300],
+      disabled: true,
+      parameters: {
+        mode: "runOnceForAllItems",
+        jsCode: "const body = $input.first().json;\nlet imageBase64 = null;\ntry {\n  const parts = body.candidates[0].content.parts;\n  const imgPart = parts.find(p => p.inlineData);\n  imageBase64 = imgPart ? imgPart.inlineData.data : null;\n} catch (e) { imageBase64 = null; }\nreturn [{ json: { imageBase64 } }];",
+      },
+      notes: "Gemini devuelve la imagen dentro de candidates[0].content.parts[].inlineData.data (base64) -- forma de respuesta distinta a la de OpenAI, por eso necesita su propio nodo de normalizacion.",
+    },
+    {
+      id: "merge1",
+      name: "Combinar datos e imagen",
+      type: "n8n-nodes-base.merge",
+      typeVersion: 3,
+      position: [1260, 340],
+      parameters: { mode: "combine", combineBy: "combineAll", options: {} },
+    },
+    {
+      id: "code1",
+      name: "Construir HTML de la infografia",
+      type: "n8n-nodes-base.code",
+      typeVersion: 2,
+      position: [1380, 340],
+      parameters: { mode: "runOnceForAllItems", jsCode: construirHtmlCode },
+      notes: "Arma el HTML consolidando los KPIs y graficos que ya vienen calculados desde el navegador (nombre+valor, top5 por grafico), mas la ilustracion del Agente como fondo decorativo del encabezado. Nunca inventa cifras -- solo aplica diseño.",
+    },
+    {
+      id: "http1d",
+      name: "HTML a imagen (Rendex)",
+      type: "n8n-nodes-base.httpRequest",
+      typeVersion: 4.2,
+      position: [1620, 300],
+      parameters: {
+        method: "POST",
+        url: "https://api.rendex.dev/v1/screenshot",
+        authentication: "genericCredentialType",
+        genericAuthType: "httpHeaderAuth",
+        sendHeaders: true,
+        headerParameters: { parameters: [{ name: "content-type", value: "application/json" }] },
+        sendBody: true,
+        specifyBody: "json",
+        jsonBody: "={{ JSON.stringify({ html: $json.html, format: 'png', width: 900, height: 1200 }) }}",
+        options: { response: { response: { responseFormat: "file" } } },
+      },
+      credentials: { httpHeaderAuth: { id: "", name: "Rendex API Key (Authorization)" } },
+      notes: "Opcion mas simple: un solo paso (a diferencia de hcti.io que necesita crear + descargar por separado), y usa la MISMA forma de credencial que ya configuraste para OpenAI (Header Auth, header 'Authorization', valor 'Bearer TU-LLAVE'). 500 imagenes gratis al mes. Consigue la llave en rendex.dev.",
+    },
+    {
+      id: "http1b",
+      name: "HTML a imagen (crear en hcti.io) [alternativa]",
+      type: "n8n-nodes-base.httpRequest",
+      typeVersion: 4.2,
+      position: [1620, 380],
+      disabled: true,
+      parameters: {
+        method: "POST",
+        url: "https://hcti.io/v1/image",
+        authentication: "genericCredentialType",
+        genericAuthType: "httpBasicAuth",
+        sendBody: true,
+        specifyBody: "json",
+        jsonBody: "={{ JSON.stringify({ html: $json.html }) }}",
+        options: {},
+      },
+      credentials: { httpBasicAuth: { id: "", name: "hcti.io (User ID + API Key)" } },
+      notes: "Alternativa a Rendex. Credencial 'Basic Auth': usuario = tu User ID, password = tu API Key, ambos en el dashboard de hcti.io. Plan gratis: 50 imagenes/mes. Devuelve { url, id }, no la imagen directamente -- necesita el nodo 'descargar de hcti.io' despues.",
+    },
+    {
+      id: "http1c",
+      name: "HTML a imagen (descargar de hcti.io) [alternativa]",
+      type: "n8n-nodes-base.httpRequest",
+      typeVersion: 4.2,
+      position: [1740, 380],
+      disabled: true,
+      parameters: {
+        method: "GET",
+        url: "={{ $json.url }}",
+        options: { response: { response: { responseFormat: "file" } } },
+      },
+      notes: "Solo se usa junto con 'crear en hcti.io'. hcti.io devuelve una URL (no el binario directo) -- este nodo la descarga.",
+    },
+    {
+      id: "http1",
+      name: "HTML a imagen (Puppeteer propio) [alternativa, requiere servidor]",
+      type: "n8n-nodes-base.httpRequest",
+      typeVersion: 4.2,
+      position: [1620, 460],
+      disabled: true,
       parameters: {
         method: "POST",
         url: "http://localhost:4000/render",
         sendBody: true,
         specifyBody: "json",
-        jsonBody: "={{ JSON.stringify({ html: $json.html, width: 1080 }) }}",
+        jsonBody: "={{ JSON.stringify({ html: $json.html, width: 900 }) }}",
         options: { response: { response: { responseFormat: "file" } } },
       },
-      notes: "Apunta al microservicio Puppeteer incluido (html-image-service/) o a un servicio pago como htmlcsstoimage.com.",
+      notes: "Alternativa si tienes tu propio servidor: usa el microservicio Puppeteer (ver html-image-service/ en esta carpeta). Reemplaza 'localhost' por el nombre real del servicio si lo despliegas en EasyPanel u otro PaaS basado en Docker.",
     },
     {
       id: "respond1",
       name: "Responder al webhook",
       type: "n8n-nodes-base.respondToWebhook",
-      typeVersion: 1,
-      position: [2200, 300],
+      typeVersion: 1.1,
+      position: [1860, 300],
       parameters: {
         respondWith: "json",
-        responseBody:
-          "={{ JSON.stringify({ type: 'tablero', title: $('Construir HTML').first().json.analysis.datasetName, category: $('Construir HTML').first().json.analysis.category, stats: $('Construir HTML').first().json.analysis.stats, insights: $('Construir HTML').first().json.analysis.insights, charts: $('Construir HTML').first().json.analysis.charts, columns: $('Construir HTML').first().json.analysis.columns, rows: $('Construir HTML').first().json.analysis.rows, imageBase64: $binary.data.toString('base64') }) }}",
+        responseBody: "={{ { imageBase64: $binary.data.toString('base64') } }}",
       },
     },
   ],
   connections: {
     Webhook: {
-      main: [
-        [
-          { node: "Viene ya analizado (infografia)?", type: "main", index: 0 },
-        ],
-      ],
+      main: [[
+        { node: "Preparar datos para el Agente", type: "main", index: 0 },
+        { node: "Combinar datos e imagen", type: "main", index: 1 },
+      ]],
     },
-    "Viene ya analizado (infografia)?": {
-      main: [
-        [{ node: "Usar analisis del cliente", type: "main", index: 0 }],
-        [{ node: "Tiene datasetId?", type: "main", index: 0 }],
-      ],
+    "Preparar datos para el Agente": { main: [[{ node: "Agente IA (elige ilustracion)", type: "main", index: 0 }]] },
+    "Agente IA (elige ilustracion)": {
+      main: [[
+        { node: "Generar imagen IA (OpenAI)", type: "main", index: 0 },
+        { node: "Generar imagen IA (Gemini) [alternativa]", type: "main", index: 0 },
+      ]],
     },
-    "Tiene datasetId?": {
-      main: [
-        [{ node: "Traer datos de datos.gov.co", type: "main", index: 0 }],
-        [{ node: "Normalizar filas (manual)", type: "main", index: 0 }],
-      ],
-    },
-    "Traer datos de datos.gov.co": {
-      main: [[{ node: "Normalizar filas (Socrata)", type: "main", index: 0 }]],
-    },
-    "Normalizar filas (Socrata)": {
-      main: [[{ node: "Analizar dataset", type: "main", index: 0 }]],
-    },
-    "Normalizar filas (manual)": {
-      main: [[{ node: "Analizar dataset", type: "main", index: 0 }]],
-    },
-    "Usar analisis del cliente": {
-      main: [
-        [
-          { node: "Agente IA (redacta narrativa)", type: "main", index: 0 },
-          { node: "Preparar prompt de imagen", type: "main", index: 0 },
-        ],
-      ],
-    },
-    "Analizar dataset": {
-      main: [
-        [
-          { node: "Agente IA (redacta narrativa)", type: "main", index: 0 },
-          { node: "Preparar prompt de imagen", type: "main", index: 0 },
-        ],
-      ],
-    },
-    "Agente IA (redacta narrativa)": {
-      main: [[{ node: "Combinar narrativa e imagen", type: "main", index: 0 }]],
-    },
-    "Modelo de Chat (OpenAI)": {
-      ai_languageModel: [[{ node: "Agente IA (redacta narrativa)", type: "ai_languageModel", index: 0 }]],
-    },
-    "Preparar prompt de imagen": {
-      main: [[{ node: "Generar imagen IA", type: "main", index: 0 }]],
-    },
-    "Generar imagen IA": {
-      main: [[{ node: "Combinar narrativa e imagen", type: "main", index: 1 }]],
-    },
-    "Combinar narrativa e imagen": {
-      main: [[{ node: "Construir HTML", type: "main", index: 0 }]],
-    },
-    "Construir HTML": {
-      main: [[{ node: "HTML a imagen", type: "main", index: 0 }]],
-    },
-    "HTML a imagen": {
-      main: [[{ node: "Responder al webhook", type: "main", index: 0 }]],
-    },
+    "Modelo de Chat (OpenAI)": { ai_languageModel: [[{ node: "Agente IA (elige ilustracion)", type: "ai_languageModel", index: 0 }]] },
+    "Generar imagen IA (OpenAI)": { main: [[{ node: "Normalizar imagen (OpenAI)", type: "main", index: 0 }]] },
+    "Normalizar imagen (OpenAI)": { main: [[{ node: "Combinar datos e imagen", type: "main", index: 0 }]] },
+    "Generar imagen IA (Gemini) [alternativa]": { main: [[{ node: "Normalizar imagen (Gemini)", type: "main", index: 0 }]] },
+    "Normalizar imagen (Gemini)": { main: [[{ node: "Combinar datos e imagen", type: "main", index: 0 }]] },
+    "Combinar datos e imagen": { main: [[{ node: "Construir HTML de la infografia", type: "main", index: 0 }]] },
+    "Construir HTML de la infografia": { main: [[{ node: "HTML a imagen (Rendex)", type: "main", index: 0 }]] },
+    "HTML a imagen (Rendex)": { main: [[{ node: "Responder al webhook", type: "main", index: 0 }]] },
   },
-  pinData: {},
-  meta: { instanceId: "el-rosal-asistente" },
+  settings: { executionOrder: "v1" },
 };
 
-fs.writeFileSync("/home/claude/n8n-flow/asistente-el-rosal-imagen.json", JSON.stringify(workflow, null, 2));
+fs.writeFileSync(
+  require("path").join(__dirname, "lienzo-ejecutivo-infografia.json"),
+  JSON.stringify(workflow, null, 2)
+);
 console.log("workflow JSON generado");
+

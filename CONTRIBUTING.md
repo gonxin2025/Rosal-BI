@@ -23,8 +23,10 @@ Abre un [Issue](../../issues) describiendo:
 - **Nunca subas datos con información personal real** (nombres, cédulas,
   teléfonos, direcciones) a `datasets/originales/` — usa el
   `frontend/verificador-calidad/` para detectar esto antes de subir nada.
-- Las credenciales de APIs (OpenAI, Anthropic) **nunca van en el código**
-  — se configuran como credenciales dentro de n8n, no en este repositorio.
+- Las credenciales de APIs (OpenAI, Anthropic, etc.) **nunca van en el
+  código** — si el proyecto llega a necesitar alguna, se configuran
+  como variables de entorno o credenciales del servicio que las use,
+  nunca hardcodeadas en este repositorio.
 - Si agregas un dashboard nuevo en `dashboards/`, sigue la misma
   estructura de carpeta por tema que ya existe (`poblacion/`,
   `salud/`, etc.).

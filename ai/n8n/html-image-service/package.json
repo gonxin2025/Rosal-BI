@@ -1,13 +1,13 @@
 {
   "name": "html-image-service",
   "version": "1.0.0",
-  "description": "Convierte HTML en una imagen PNG exacta usando Puppeteer, para el flujo del asistente de datos abiertos de El Rosal.",
+  "description": "Convierte HTML en una imagen PNG usando Puppeteer. Usado por el flujo de n8n del Lienzo Ejecutivo para generar la infografia.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "puppeteer": "^22.15.0"
+    "puppeteer": "^22.0.0"
   }
 }

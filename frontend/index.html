@@ -10,7 +10,7 @@
   body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text)}
   header{background:var(--navy);color:#fff;padding:3rem 1.5rem;text-align:center}
   header h1{font-size:28px;margin-bottom:8px}
-  header p{color:#B9C4D4;font-size:14px}
+  header p{color:#B9C4D4;font-size:14px;max-width:600px;margin:0 auto;line-height:1.5}
   main{max-width:800px;margin:2rem auto;padding:0 1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:20px}
   @media (max-width:600px){ main{grid-template-columns:1fr} }
   a.card{
@@ -25,13 +25,14 @@
 </head>
 <body>
 <header>
-  <h1>🏛️ Rosal BI</h1>
-  <p>Plataforma de inteligencia de datos y datos abiertos — Alcaldía de El Rosal, Cundinamarca</p>
+  <img src="assets/logo.png" alt="Rosal BI" style="width:72px;height:72px;object-fit:contain;margin-bottom:10px">
+  <h1>Rosal BI</h1>
+  <p>"Transformamos datos abiertos de datos.gov.co mediante IA que perfila, grafica y predice tendencias automáticamente, eliminando la barrera técnica para que gobiernos y ciudadanos tomen decisiones ejecutivas en segundos."</p>
 </header>
 <main>
   <a class="card" href="dashboard/index.html">
-    <h2>📊 Consola de datos abiertos</h2>
-    <p>Busca datasets de datos.gov.co, carga tu propio Excel/CSV o API, y obtén al instante totales, hallazgos y gráficas — sin configurar nada.</p>
+    <h2>📊 Lienzo Ejecutivo</h2>
+    <p>Busca datasets de datos.gov.co o carga tu Excel/CSV, revisa el plan de KPIs/gráficos propuesto, y genera un informe ejecutivo con proyección estadística incluida — exportable a PDF.</p>
   </a>
   <a class="card" href="verificador-calidad/index.html">
     <h2>✅ Verificador de calidad</h2>

@@ -7,9 +7,22 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ## [Unreleased]
 
 ### Por hacer
-- Conectar el webhook de n8n en producción (`WEBHOOK_URL` en `frontend/dashboard/index.html`).
-- Instalar y dejar corriendo el microservicio `ai/n8n/html-image-service`.
-- Poblar `datasets/catalogo.csv` con los datasets reales de El Rosal.
+- Registrar el proyecto en https://herramientas.datos.gov.co/usos (requisito del concurso).
+
+## [0.4.0] — Lienzo Ejecutivo reemplaza la consola original
+
+### Cambiado
+- `frontend/dashboard/` ahora contiene **Lienzo Ejecutivo** en vez de la consola original (`el-rosal-consola`): perfilado heurístico de columnas (fecha/dimensión/medida), plan de panel revisable con checkboxes antes de generar, tabla de proyección estadística, metadatos reales del dataset desde la API de Socrata.
+
+### Corregido
+- Bug real de bucle infinito en la exportación a PDF: cuando la altura del lienzo caía cerca de un múltiplo exacto de página A4, un residuo de punto flotante impedía que el bucle de paginado terminara, colgando el navegador indefinidamente. Corregido con una tolerancia en la condición del bucle más un salvavidas defensivo.
+
+### Eliminado
+- Archivo duplicado `docs/README (3).md` (artefacto de una subida anterior).
+
+### Agregado
+- Identidad visual real de Rosal BI: logo, favicon y banner oficiales (reemplazan los placeholders generados).
+- `presentacion/`: deck de la presentación ante el jurado.
 
 ## [0.3.0] — Verificador de calidad de datos abiertos
 

@@ -11,9 +11,10 @@ términos de referencia del Concurso Datos al Ecosistema 2026.
 municipio + registros federados por URL), con más de 10 variables por
 dataset típico, e incorpora procesos de limpieza, transformación e
 integración de datos (ver fase de *Data Preparation* abajo), además de
-un componente de IA generativa (redacción de narrativa + generación de
-imagen temática). No se clasifica como "avanzado" porque no integra
-fuentes en tiempo real de Big Data ni arquitecturas multiagente.
+perfilado heurístico automático de columnas y proyección estadística de
+tendencias. No se clasifica como "avanzado" porque no integra fuentes
+en tiempo real de Big Data, modelos de machine learning entrenados, ni
+arquitecturas multiagente.
 
 ## 1. Business & Data Understanding
 
@@ -54,14 +55,13 @@ confirmar que el enfoque generaliza más allá de un solo caso.
 ## 3. Modeling
 
 No hay un modelo de machine learning entrenado — el "modelado" de este
-proyecto es la capa de reglas determinísticas (motor de análisis de
-columnas, motor de gráficos, verificador de errores de calidad) más la
-capa de IA generativa (LLM vía Agente de n8n, modelo de imagen).
-Deliberadamente se separó así: **el modelo estadístico/de reglas nunca
-delega en el LLM el cálculo de una cifra** — el LLM solo redacta texto
-y genera una ilustración decorativa. Esta separación es, en sí misma,
-una decisión de diseño motivada por rigor técnico: minimizar el riesgo
-de alucinación en un contexto de datos públicos.
+proyecto es una capa de reglas determinísticas: motor de perfilado de
+columnas (fecha/dimensión/medida), motor de propuesta de KPIs y
+gráficos, y cálculo de proyección estadística (tasa de crecimiento
+histórica promedio, aplicada al último periodo conocido). Ninguna cifra
+que ve el usuario depende de un modelo de lenguaje — es una decisión de
+diseño motivada por rigor técnico: eliminar el riesgo de alucinación en
+un contexto de datos públicos.
 
 ## 4. Evaluation
 
@@ -82,13 +82,8 @@ de alucinación en un contexto de datos públicos.
 
 - **Frontend**: sitio estático (`frontend/`), desplegado en Netlify sin
   build step — accesible desde cualquier navegador sin instalar nada.
-- **IA**: workflow de n8n autocontenido (`ai/n8n/`), con un microservicio
-  Puppeteer propio para la captura de imagen (`ai/n8n/html-image-service`),
-  documentado para instalarse en cualquier servidor con Node.js.
 - **Reproducibilidad**: todo el código fuente vive en este repositorio
-  público, sin dependencias privadas ni claves embebidas en el código
-  (las API keys de IA se configuran como credenciales en n8n, nunca en
-  el repositorio).
+  público, sin dependencias privadas ni claves embebidas en el código.
 
 ## 6. Monitoring (propuesto, no implementado aún)
 

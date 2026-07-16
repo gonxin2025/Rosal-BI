@@ -1,9 +1,8 @@
 # Backend (estructura preparada, sin desarrollar aún)
 
-Por ahora, toda la orquestación de IA vive en `ai/n8n/` (un workflow de
-n8n) y toda la logica de analisis vive directo en el frontend
-(`frontend/dashboard/index.html`). No hay un backend propio corriendo
-todavia.
+Por ahora, toda la logica de analisis vive directo en el frontend
+(`frontend/dashboard/index.html`) — no hay ningun backend ni
+orquestacion propia corriendo todavia.
 
 Esta carpeta queda preparada por si el proyecto necesita, mas adelante,
 un servicio propio (por ejemplo, para no depender de que el navegador

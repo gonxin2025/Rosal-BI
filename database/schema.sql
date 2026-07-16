@@ -1,8 +1,8 @@
 -- =============================================================================
 -- ESQUEMA PROPUESTO -- borrador de ejemplo, no es un esquema en produccion.
 -- =============================================================================
--- El prototipo actual NO usa una base de datos: la consola analiza los
--- archivos directamente en el navegador, y n8n no persiste nada entre
+-- El prototipo actual NO usa una base de datos: el dashboard analiza los
+-- archivos directamente en el navegador y no persiste nada entre
 -- ejecuciones. Este esquema es un punto de partida para el dia que el
 -- proyecto necesite guardar datasets, historial de verificaciones de
 -- calidad, o catalogar los datasets del municipio de forma centralizada.
@@ -35,5 +35,5 @@ CREATE TABLE consultas_ciudadanas (
   dataset_id INTEGER REFERENCES datasets(id),
   pregunta TEXT,
   fecha TIMESTAMP DEFAULT NOW(),
-  respuesta_json JSONB            -- respuesta que devolvio n8n (ver docs/api.md)
+  respuesta_json JSONB            -- respuesta generada para esa consulta
 );

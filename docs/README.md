@@ -4,10 +4,11 @@ Esta carpeta contiene toda la documentación técnica y funcional del proyecto *
 
 ## Contenido
 
+- [Metodología (CRISP-ML)](metodologia.md)
 - [Arquitectura del sistema](arquitectura.md)
+- [Impacto y escalabilidad](impacto.md)
 - [Roadmap del proyecto](roadmap.md)
-- [API](api.md)
 - [Manual de usuario](manual-usuario.md)
 - [Catálogo de datos abiertos](datos-abiertos.md)
-- Guías de instalación *(ver sección correspondiente en cada README de módulo)*
+- [Licencias de terceros](licencias-terceros.md)
 - [Diagramas de la solución](capturas/)
