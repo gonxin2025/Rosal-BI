@@ -9,6 +9,23 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 ### Por hacer
 - Registrar el proyecto en https://herramientas.datos.gov.co/usos (requisito del concurso).
 
+## [0.5.0] — Rosal BI: rediseño completo, estadística real, IA conectada
+
+### Agregado
+- Rediseño completo de la interfaz: navegación por menú lateral, identidad visual "Rosal BI" con logo real, tema oscuro.
+- Motor estadístico real: desviación estándar, correlación entre variables, detección automática de valores atípicos — probado con 10.000 filas en menos de 100ms.
+- Proyecciones con rango de confianza en vez de un número único.
+- Comparador de pares (entidad específica vs. grupo de pares).
+- Referencias externas asíncronas y no-bloqueantes: resumen de Wikipedia + datasets relacionados de datos.gov.co.
+- Chat con IA real ("Narrador Experto"): flujo de n8n (`ai/n8n/`) con Agente + modelo de chat intercambiable, memoria de conversación por sesión, y acceso a la lista completa de cada gráfica (no solo un "top 5") para responder sobre cualquier categoría.
+- Diseño responsive: menú lateral deslizable en tablet/celular, sin desborde horizontal verificado en 375px/768px/1440px.
+- Presentación actualizada con la identidad visual real y las nuevas capacidades de IA.
+
+### Corregido
+- Bug real: columnas tipo tasa/porcentaje se sumaban en vez de promediarse a través de años/entidades, amplificando valores corruptos del dataset de origen hasta cifras absurdas (2.7×10¹⁷ en un caso real). Ahora se detectan por nombre y se promedian, con rechazo de outliers de formato.
+- Bug real: el nodo del webhook de n8n leía el cuerpo del POST en el lugar equivocado (`$json` en vez de `$json.body`), causando que el contexto le llegara vacío al Narrador Experto.
+- Bug real del bucle infinito en PDF, que volvió a aparecer al regenerarse el archivo — documentado explícitamente para evitar que se repita una tercera vez.
+
 ## [0.4.0] — Lienzo Ejecutivo reemplaza la consola original
 
 ### Cambiado

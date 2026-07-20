@@ -1,33 +1,46 @@
 # Manual de usuario
 
-## 1. Generar un lienzo ejecutivo (dashboard principal)
+## 1. Generar un panel ejecutivo (dashboard principal)
 
 Abre `frontend/dashboard/index.html` (o [rosal-bi.netlify.app](https://rosal-bi.netlify.app)).
+La navegación está en el menú lateral izquierdo (en celular/tablet, un
+botón ☰ arriba a la izquierda lo despliega).
 
-1. **Busca un dataset**: escribe una palabra clave (ej. "trámites",
-   "presupuesto") y presiona "Consultar" — se consulta en vivo el
-   catálogo de datos.gov.co, incluyendo sus metadatos reales (vistas,
-   descargas, entidad publicadora).
-2. **O carga el tuyo**: usa "📂 Subir Archivo" para un CSV o JSON local.
-3. **Revisa el plan del panel** (pestaña "Resumen del panel"): el
-   sistema perfila las columnas (fechas, dimensiones, medidas) y
-   propone automáticamente tarjetas KPI, gráficos y tablas de resumen
-   — incluida una tabla de **proyección** cuando hay fecha + medida
-   (marca el periodo estimado con una etiqueta "Estimado").
-   - Usa "✨ Ver solo sugerencias IA" para ver solo lo que el sistema
-     considera más relevante, o desactívalo para ver todas las
-     combinaciones posibles.
-   - Marca o desmarca cualquier tarjeta/gráfico/tabla con el checkbox.
-   - Cambia el tipo de cualquier gráfico (barras, líneas, anillo, área
-     polar) con el menú desplegable.
-4. **"✨ Generar Lienzo"**: arma el panel final con lo que dejaste
-   marcado (pestaña "Lienzo Ejecutivo").
-5. **"📄 Descargar PDF"**: exporta el lienzo completo, paginado
+1. **🔍 Buscar / Cargar**: escribe una palabra clave (ej. "trámites",
+   "PAE", "presupuesto") y presiona "Consultar API" — se consulta en
+   vivo el catálogo de datos.gov.co, incluyendo metadatos reales
+   (vistas, descargas, entidad publicadora). O usa "📂 Subir
+   Excel/CSV/JSON" para un archivo local.
+2. **Revisa el plan del panel**: el sistema perfila las columnas
+   (Fecha, Dimensión, Medida) y propone KPIs, gráficos y tablas —
+   incluida una fila con **proyección** cuando hay fecha + medida (con
+   un rango de confianza, no un número único, si la tendencia ha sido
+   volátil). Marca/desmarca cualquier elemento y cambia el tipo de
+   cualquier gráfico (barras, líneas, anillo, área polar, dispersión)
+   antes de generar.
+3. **"✨ Generar Lienzo"**: arma el panel final (pestaña "📊 Lienzo
+   Ejecutivo").
+4. **"📄 Descargar PDF"**: exporta el panel completo, paginado
    automáticamente si es más largo que una página A4.
-6. **Pestaña "Datos Originales"**: ficha completa de metadatos
-   (creación, actualización, vistas/descargas, entidad, categoría) y
-   una muestra de los datos crudos, con cada columna etiquetada según
-   su tipo detectado (Fecha, Categoría, Numérica, Texto).
+5. **Pestaña "🤖 Análisis IA"**: incluye
+   - El **comparador de pares**: elige una entidad (ej. El Rosal),
+     opcionalmente un grupo de pares (ej. solo municipios de
+     Cundinamarca), y ve su ranking, promedio del grupo, y posición
+     relativa.
+   - Hallazgos automáticos por cada gráfica seleccionada, incluida
+     estadística real (desviación estándar, correlación, valores
+     atípicos) y referencias externas (resumen de Wikipedia + datasets
+     relacionados, marcados claramente como enlaces externos).
+6. **Pestaña "🗂️ Datos Originales"**: ficha completa de metadatos y una
+   muestra de los datos crudos, con cada columna etiquetada según su
+   tipo detectado.
+7. **Chat (ícono 💬 abajo a la derecha)**: preguntas rápidas ("top 10
+   de X", "promedio de Y", "cuántos registros hay") se responden al
+   instante. Preguntas más abiertas ("cómo está El Rosal en este
+   tema", "dame una proyección") las responde el **Narrador Experto**
+   — un modelo de IA conectado vía n8n que usa los datos ya calculados
+   del panel (la lista completa de cada gráfica, no solo lo más
+   destacado) para responder directo, sin inventar cifras.
 
 ## 2. Verificar calidad antes de publicar
 
@@ -50,7 +63,17 @@ Abre `frontend/verificador-calidad/index.html`.
 **¿Necesito instalar algo?** No. Ambas herramientas son un solo archivo
 HTML que corre en el navegador.
 
-**¿Mis datos se suben a algún servidor?** No. Todo el análisis, el plan
-del panel y la generación del PDF corren en tu navegador. La única
-llamada externa es a la API pública de datos.gov.co para buscar/cargar
-datasets.
+**¿Mis datos se suben a algún servidor?** El análisis, el plan del
+panel y la generación del PDF corren 100% en tu navegador. Hay dos
+excepciones puntuales, siempre visibles para el usuario: (1) el panel
+de referencias externas hace una llamada a la API pública de Wikipedia
+para el resumen de la entidad detectada; (2) si usas el chat con una
+pregunta abierta, se manda al Narrador Experto (vía n8n) un resumen de
+los KPIs/gráficas/estadísticas ya calculados — nunca el archivo
+original completo fila por fila.
+
+**¿Por qué el chat a veces tarda más la primera vez?** El primer
+mensaje de cada dataset cargado manda el contexto completo (para que
+el Narrador pueda responder sobre cualquier categoría, no solo lo más
+destacado) — los mensajes siguientes de esa misma conversación son más
+rápidos porque ya no repiten esa información.

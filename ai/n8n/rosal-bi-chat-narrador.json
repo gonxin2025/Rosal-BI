@@ -1,0 +1,168 @@
+{
+  "name": "Rosal BI - Chat Narrador Experto",
+  "nodes": [
+    {
+      "id": "webhook1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rosal-bi-chat-narrador",
+      "parameters": {
+        "path": "chat-narrador",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "code1",
+      "name": "Preparar contexto para el Narrador",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst raw = $input.first().json;\n// El nodo Webhook de n8n anida el POST body real bajo \"body\" -- esto\n// cubre ambos casos (si en tu version/config viene anidado o plano),\n// para que nunca vuelva a llegar vacio como paso la primera vez.\nconst body = (raw && typeof raw.body === 'object' && raw.body !== null) ? raw.body : raw;\nconst pregunta = body.pregunta || \"\";\nconst sessionId = body.sessionId || \"sesion-sin-id\";\nconst esPrimerMensaje = body.esPrimerMensaje !== false; // por compatibilidad, si no viene se asume primero\n\n// A partir del segundo mensaje de la misma conversacion, la app ya NO\n// reenvia los KPIs/graficas/estadisticas -- el Agente los recuerda via\n// memoria de n8n (ver nodo \"Memoria de la conversacion\"), evitando\n// repetir el mismo contexto grande en cada mensaje del chat.\nif (!esPrimerMensaje) {\n  return [{ json: { resumenParaNarrador: \"PREGUNTA DE SEGUIMIENTO DEL USUARIO (usa el contexto de tu memoria de esta conversacion): \" + pregunta, pregunta, sessionId } }];\n}\n\nconst titulo = body.titulo || \"el dataset\";\nconst categoria = body.categoria || \"General\";\nconst institucion = body.institucion || \"Datos Abiertos Colombia\";\nconst kpis = Array.isArray(body.kpis) ? body.kpis : [];\nconst graficos = Array.isArray(body.graficos) ? body.graficos : [];\nconst estadisticas = body.estadisticas || {};\nconst comparacion = body.comparacion || null;\nconst otrasColumnas = Array.isArray(body.otrasColumnasDisponibles) ? body.otrasColumnasDisponibles : [];\n\nlet resumen = \"DATASET: \" + titulo + \" | CATEGORIA: \" + categoria + \" | FUENTE: \" + institucion + \"\\n\\n\";\n\nif (kpis.length) {\n  resumen += \"KPIS CALCULADOS (estos son los UNICOS numeros que puedes citar como cifras de este dataset):\\n\";\n  kpis.forEach(k => { resumen += \"- \" + k.nombre + \": \" + k.valor + \"\\n\"; });\n  resumen += \"\\n\";\n}\n\nif (graficos.length) {\n  resumen += \"GRAFICAS (LISTA COMPLETA de cada categoria, ordenada de mayor a menor -- puedes citar CUALQUIERA de estos valores, incluidos los ultimos/menores, no solo los primeros):\\n\";\n  graficos.forEach(g => {\n    const nota = g.truncado ? ` (mostrando las primeras ${g.valores.length} de ${g.totalCategorias} categorias totales)` : ` (${g.totalCategorias} categorias, lista completa)`;\n    resumen += \"- \" + g.titulo + nota + \":\\n\";\n    (g.valores || []).forEach(d => { resumen += \"    \" + d.label + \": \" + d.value + \"\\n\"; });\n  });\n  resumen += \"\\n\";\n}\n\nif (estadisticas.media !== undefined) {\n  resumen += \"ESTADISTICA DESCRIPTIVA: media=\" + estadisticas.media + \", desviacion_estandar=\" + estadisticas.desviacion +\n    (estadisticas.correlacion !== undefined && estadisticas.correlacion !== null ? \", correlacion=\" + estadisticas.correlacion : \"\") + \"\\n\\n\";\n}\n\nif (estadisticas.proyeccion) {\n  resumen += \"PROYECCION YA CALCULADA (no la recalcules, solo interpretala): \" + JSON.stringify(estadisticas.proyeccion) + \"\\n\\n\";\n}\n\nif (estadisticas.atipicos && estadisticas.atipicos.length) {\n  resumen += \"VALORES ATIPICOS DETECTADOS: \" + estadisticas.atipicos.join(\", \") + \"\\n\\n\";\n}\n\nif (otrasColumnas.length) {\n  resumen += \"OTRAS COLUMNAS DISPONIBLES EN LA TABLA (no estan en ninguna grafica del panel, pero SI puedes citar estos numeros -- lista completa, no solo los primeros):\\n\";\n  otrasColumnas.forEach(c => {\n    const nota = c.truncado ? ` (mostrando las primeras ${c.valores.length} de ${c.totalCategorias} categorias totales)` : ` (${c.totalCategorias} categorias, lista completa)`;\n    resumen += \"- \" + c.columna + nota + \":\\n\";\n    (c.valores || []).forEach(d => { resumen += \"    \" + d.label + \": \" + d.value + \" registros\\n\"; });\n  });\n  resumen += \"\\n\";\n}\n\nif (comparacion) {\n  resumen += \"EL USUARIO QUIERE COMPARAR: \" + JSON.stringify(comparacion) + \"\\n\\n\";\n}\n\nresumen += \"PREGUNTA DEL USUARIO: \" + pregunta;\n\nreturn [{ json: { resumenParaNarrador: resumen, pregunta, sessionId } }];\n"
+      },
+      "notes": "Convierte los KPIs/graficas/estadisticas que la app YA calculo en un resumen de texto. El Agente nunca ve el dataset crudo, solo estos numeros ya calculados."
+    },
+    {
+      "id": "memory1",
+      "name": "Memoria de la conversación",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        720,
+        620
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId }}",
+        "contextWindowLength": 8
+      },
+      "notes": "Guarda las ultimas 8 interacciones de CADA conversacion (identificada por sessionId, que la app genera una vez por dataset cargado). Esto es lo que le permite al Narrador recordar el contexto sin que la app se lo repita en cada mensaje."
+    },
+    {
+      "id": "agent1",
+      "name": "Narrador Experto (Agente IA)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.resumenParaNarrador }}",
+        "options": {
+          "systemMessage": "Eres el 'Narrador Experto' de Rosal BI, una plataforma de datos abiertos para el municipio de El Rosal, Cundinamarca. La aplicacion ya calculo TODOS los numeros de forma determinista (KPIs, promedios, correlaciones, proyecciones) -- tu trabajo es RESPONDER DIRECTAMENTE la pregunta del usuario usando esos numeros reales, NUNCA calcular ni inventar cifras nuevas.\n\nREGLA ABSOLUTA: la unica cifra que puedes citar como dato de ESTE dataset es la que aparece literalmente en el contexto que recibiste (KPIS CALCULADOS, GRAFICAS, ESTADISTICA DESCRIPTIVA, PROYECCION, OTRAS COLUMNAS DISPONIBLES) -- ya sea en este mensaje o en un mensaje anterior de esta misma conversacion (tu memoria). Si la pregunta requiere una cifra que no esta en ninguno de los dos, dilo explicitamente ('ese dato no esta disponible en este panel') en vez de inventarla o estimarla.\n\nIMPORTANTE SOBRE LAS GRAFICAS Y COLUMNAS: recibes la LISTA COMPLETA de cada categoria (no solo un 'top 5'), salvo que el mensaje indique explicitamente que se truncó por exceder el limite. Esto significa que SI puedes responder sobre los valores mas bajos ('los ultimos', 'el menor'), sobre una entidad especifica que no sea la mas alta (ej. un municipio puntual), o sobre cualquier categoria intermedia -- BUSCA la entidad exacta que te pregunten en esas listas antes de responder, no asumas que 'no esta disponible' sin revisarlas primero.\n\nIMPORTANTE SOBRE LA CONVERSACION: solo el PRIMER mensaje de cada conversacion trae el contexto completo (KPIs/graficas/estadisticas). En los mensajes siguientes, ese contexto NO se repite -- debes recordarlo de tu memoria de esta conversacion, no pedirlo de nuevo ni asumir que no existe.\n\nCOMO RESPONDER: ve DIRECTO al grano, con las cifras exactas que te pidieron. No abras con un parrafo de contexto general del tema/programa/sector -- eso no es lo que el usuario pidio y le quita espacio a la respuesta real. Ejemplo: si preguntan 'como esta El Rosal en alimentacion escolar y como se ha desempeñado en los años, dame una proyeccion', responde con el valor exacto de El Rosal (buscandolo en las listas completas que recibiste), la evolucion año a año si esta en el contexto, y la proyeccion ya calculada -- todo en cifras reales, sin preambulo institucional. Solo menciona contexto institucional (que hace una entidad, como opera un programa) si eso AYUDA a interpretar la cifra que ya diste, nunca como apertura obligatoria. Si el usuario pide explicitamente contexto o antecedentes del tema, ahi si dalo.\n\nResponde en español, tono ejecutivo pero claro, directo, sin tecnicismos innecesarios ni relleno."
+        }
+      },
+      "notes": "El 'Narrador Experto': responde directo con cifras reales de la tabla completa, nunca calcula, y ya no abre con un parrafo de contexto general por defecto -- solo si el usuario lo pide."
+    },
+    {
+      "id": "chatModel1",
+      "name": "Modelo de Chat (OpenAI)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        720,
+        480
+      ],
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI account"
+        }
+      },
+      "notes": "Cambialo por 'Google Gemini Chat Model' o 'Anthropic Chat Model' si prefieres otro proveedor -- solo reconectalo al mismo puerto 'Chat Model' del Agente. Temperature baja (0.3) a proposito: menos creatividad, mas apego a los datos provistos."
+    },
+    {
+      "id": "respond1",
+      "name": "Responder al webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { respuesta: $json.output } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Preparar contexto para el Narrador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar contexto para el Narrador": {
+      "main": [
+        [
+          {
+            "node": "Narrador Experto (Agente IA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Narrador Experto (Agente IA)": {
+      "main": [
+        [
+          {
+            "node": "Responder al webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo de Chat (OpenAI)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Narrador Experto (Agente IA)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memoria de la conversación": {
+      "ai_memory": [
+        [
+          {
+            "node": "Narrador Experto (Agente IA)",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -9,6 +9,12 @@ puntaje de cada criterio visible en el título de la diapositiva
 correspondiente (Innovación 15 pts, Datos Abiertos 20 pts, Rigor
 Técnico 15 pts, IA 20 pts, Diseño 10 pts, Impacto 20 pts).
 
-Paleta y tipografía (Segoe UI) alineadas con el Lienzo Ejecutivo real,
-para que coincida visualmente con lo que el jurado ve en la demo en
-vivo.
+Marca consistente en las 10 diapositivas: pie de página **"ROSAL BI ·
+DATOS QUE TRANSFORMAN"**, alineado con el banner oficial del proyecto
+(`images/banner/banner-rosal-bi.png`). Paleta y tipografía (Segoe UI)
+alineadas con el Lienzo Ejecutivo real, para que coincida visualmente
+con lo que el jurado ve en la demo en vivo.
+
+> Si renombras el archivo a algo como `Rosal_BI_Presentacion.pptx` para
+> que el nombre del archivo también use la marca "Rosal BI", actualiza
+> esta línea y la referencia en `README.md` de la raíz.

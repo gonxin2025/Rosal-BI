@@ -11,9 +11,11 @@ términos de referencia del Concurso Datos al Ecosistema 2026.
 municipio + registros federados por URL), con más de 10 variables por
 dataset típico, e incorpora procesos de limpieza, transformación e
 integración de datos (ver fase de *Data Preparation* abajo), además de
-perfilado heurístico automático de columnas y proyección estadística de
-tendencias. No se clasifica como "avanzado" porque no integra fuentes
-en tiempo real de Big Data, modelos de machine learning entrenados, ni
+perfilado heurístico automático de columnas, proyección estadística
+con rango de confianza, y un Agente de IA conectado vía n8n (el
+"Narrador Experto") que interpreta esos resultados ya calculados. No
+se clasifica como "avanzado" porque no integra fuentes en tiempo real
+de Big Data, modelos de machine learning entrenados propios, ni
 arquitecturas multiagente.
 
 ## 1. Business & Data Understanding
@@ -54,14 +56,22 @@ confirmar que el enfoque generaliza más allá de un solo caso.
 
 ## 3. Modeling
 
-No hay un modelo de machine learning entrenado — el "modelado" de este
-proyecto es una capa de reglas determinísticas: motor de perfilado de
-columnas (fecha/dimensión/medida), motor de propuesta de KPIs y
-gráficos, y cálculo de proyección estadística (tasa de crecimiento
-histórica promedio, aplicada al último periodo conocido). Ninguna cifra
-que ve el usuario depende de un modelo de lenguaje — es una decisión de
-diseño motivada por rigor técnico: eliminar el riesgo de alucinación en
-un contexto de datos públicos.
+No hay un modelo de machine learning entrenado propio — el "modelado"
+determinístico de este proyecto (motor de perfilado de columnas,
+motor de propuesta de KPIs y gráficos, estadística descriptiva,
+correlación, detección de atípicos, y proyección con rango de
+confianza) es una capa de reglas fijas en JavaScript, corre en el
+navegador, y es la ÚNICA fuente de cualquier cifra que ve el usuario.
+
+Aparte de eso, el proyecto sí tiene un componente de IA generativa: el
+"Narrador Experto", un Agente conectado vía n8n a un modelo de
+lenguaje (OpenAI/Gemini/Anthropic, intercambiable) que responde
+preguntas del chat. Su rol está deliberadamente acotado: recibe los
+números que el navegador ya calculó y los explica — nunca calcula, ni
+estima, ni tiene acceso al dataset crudo. Es una decisión de diseño
+motivada por rigor técnico: eliminar el riesgo de alucinación
+numérica en un contexto de datos públicos, sin renunciar a que un
+modelo de lenguaje aporte donde sí es bueno — interpretar y explicar.
 
 ## 4. Evaluation
 
@@ -69,11 +79,20 @@ un contexto de datos públicos.
   para activar casos límite** (no solo con datos "felices"): archivo
   real rechazado por datos.gov.co, dataset de 650 registros de
   población con 15 dimensiones, archivo con 10 problemas de calidad
-  simultáneos a propósito.
+  simultáneos a propósito, y un valor numérico corrupto inyectado a
+  propósito para confirmar que el motor estadístico lo descarta en vez
+  de dejarlo contaminar un promedio.
+- El motor estadístico se probó con 10.000 filas sintéticas, confirmando
+  que el cálculo completo (perfilado + KPIs + estadística) toma menos
+  de 100 ms — sin bloquear la interfaz incluso con datasets grandes.
 - Las pruebas de extremo a extremo se hicieron con un navegador real
   (Chromium vía Puppeteer), no solo revisando el código — incluyendo
   verificación pixel por pixel de que los colores/notas del Excel
-  anotado caen exactamente donde deben.
+  anotado caen exactamente donde deben, y de que ningún texto se
+  desborda de las tarjetas en la presentación.
+- El flujo del Narrador Experto se probó simulando tanto una respuesta
+  exitosa como una caída de red — confirmando que el chat nunca se
+  queda "pensando" indefinidamente ni falla en silencio.
 - Se comparó el archivo real subido a GitHub contra lo entregado,
   confirmando cero diferencias y verificando la sintaxis del código
   directo desde el repositorio publicado.
@@ -82,8 +101,13 @@ un contexto de datos públicos.
 
 - **Frontend**: sitio estático (`frontend/`), desplegado en Netlify sin
   build step — accesible desde cualquier navegador sin instalar nada.
+- **IA**: el flujo de n8n (`ai/n8n/`) es la única pieza que no vive en
+  el navegador — necesita una instancia de n8n activa con una
+  credencial de modelo de chat configurada.
 - **Reproducibilidad**: todo el código fuente vive en este repositorio
-  público, sin dependencias privadas ni claves embebidas en el código.
+  público, sin dependencias privadas ni claves embebidas en el código
+  (la credencial del modelo de chat se configura en n8n, nunca en el
+  repositorio).
 
 ## 6. Monitoring (propuesto, no implementado aún)
 
