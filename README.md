@@ -30,16 +30,23 @@ Todo lo determinístico (perfilado de columnas, KPIs, correlación, desviación 
 
 | Carpeta | Contenido |
 |---|---|
-| [`docs/`](docs/) | Documentación técnica y funcional completa |
+| [`docs/`](docs/) | Documentación técnica y funcional completa — planteamiento del problema, metodología, fuentes de datos, arquitectura, impacto/ética, guía de validación, conclusiones, manual |
 | [`frontend/`](frontend/) | Rosal BI (dashboard principal) y el verificador de calidad |
 | [`ai/n8n/`](ai/n8n/) | Flujo de n8n del Narrador Experto (chat con IA) |
+| [`tests/`](tests/) | Pruebas reales de extremo a extremo (navegador real vía Puppeteer) para los bugs corregidos y el rendimiento del motor estadístico |
 | [`backend/`](backend/) | Servicios de apoyo — en construcción, no hay backend propio corriendo hoy |
 | [`datasets/`](datasets/) | Datos originales, procesados, y catálogo |
 | [`dashboards/`](dashboards/) | Tableros temáticos por sector |
 | [`scripts/`](scripts/) | Utilidades de importación, limpieza y exportación de datos |
 | [`database/`](database/) | Esquema y migraciones (borrador, no en uso) |
 | [`images/`](images/) | Logo, banner y recursos gráficos oficiales |
-| [`presentacion/`](presentacion/) | Deck de la presentación ante el jurado |
+| [`presentacion/`](presentacion/) | Deck de la presentación ante el jurado, guion de exposición y preguntas técnicas frecuentes |
+
+> No hay `requirements.txt`, `environment.yml`, `notebooks/`, `models/`
+> ni `deployments/` — Rosal BI es frontend puro (HTML/JavaScript sin
+> build step) con un único Agente de IA vía n8n, no un proyecto Python
+> con modelos entrenados. Ver la nota completa en
+> [`docs/README.md`](docs/README.md).
 
 ## Empezar rápido
 

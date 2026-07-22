@@ -31,3 +31,6 @@ datasets/originales/*.csv
 # Salidas generadas (PDFs, imagenes exportadas)
 *.pdf
 !docs/**/*.pdf
+
+# Artefactos de pruebas
+tests/_test-downloads/

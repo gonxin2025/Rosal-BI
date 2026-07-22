@@ -58,6 +58,21 @@ Abre `frontend/verificador-calidad/index.html`.
    archivo con las celdas problemáticas resaltadas en color y una nota
    explicando cada una — para revisarlo directo en Excel.
 
+## 3. APIs, variantes y modelo predictivo (referencia técnica)
+
+También disponible dentro de la app, en la pestaña **❓ Ayuda**.
+
+**APIs con las que trabajamos:**
+- `datos.gov.co/api/catalog/v1` — búsqueda en vivo en todo el catálogo nacional.
+- `datos.gov.co/resource/{id}.json` — API Socrata (SODA) para los datos reales del dataset, hasta 50.000 filas.
+- `datos.gov.co/api/views/{id}.json` — metadatos reales (vistas, descargas, entidad publicadora, fechas).
+- `es.wikipedia.org/w/api.php` — resumen de contexto de la entidad/lugar detectado (opcional, asíncrono, nunca bloquea la interfaz).
+- Webhook propio de n8n — conecta el chat con el modelo de lenguaje del Narrador Experto.
+
+**Variantes de análisis:** gráficos en barras verticales, barras horizontales, líneas, anillo, área polar y dispersión. Agregaciones en suma, promedio o conteo — el sistema elige la más sensata según el tipo de columna (promedia en vez de sumar cuando detecta una columna tipo tasa/porcentaje) y el usuario puede cambiarla manualmente.
+
+**Modelo predictivo:** un solo método, siempre el mismo, por transparencia — tasa de crecimiento promedio entre los periodos históricos disponibles, aplicada al último valor conocido, con un rango de ± 1 desviación estándar de esa tasa (se ensancha si la tendencia ha sido volátil). Se aplica cuando hay al menos una columna de fecha y una medida numérica con 2 o más periodos. No es un modelo de machine learning entrenado — decisión deliberada para que sea explicable y verificable por cualquier persona, no solo por un especialista en datos. **Pendiente para una futura versión**: que el sistema elija automáticamente entre distintos métodos de proyección según el patrón de los datos (por ejemplo, series con estacionalidad marcada) — hoy se prefirió un método único y transparente sobre uno adaptativo, para minimizar el riesgo de resultados difíciles de explicar en esta etapa del proyecto.
+
 ## Preguntas frecuentes
 
 **¿Necesito instalar algo?** No. Ambas herramientas son un solo archivo

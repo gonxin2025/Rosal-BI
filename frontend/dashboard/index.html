@@ -162,6 +162,7 @@
             <div class="nav-item" id="nav-panel" onclick="switchTab('panel')">📊 Lienzo Ejecutivo</div>
             <div class="nav-item" id="nav-insights" onclick="switchTab('insights')">🤖 Análisis IA</div>
             <div class="nav-item" id="nav-data" onclick="switchTab('data')">🗂️ Datos Originales</div>
+            <div class="nav-item" id="nav-ayuda" onclick="switchTab('ayuda')">❓ Ayuda</div>
         </nav>
         <div style="padding: 24px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: #a78bfa;">
             <p style="margin: 0; opacity: 0.8;">Concurso Datos 2026</p>
@@ -296,8 +297,60 @@
             </div>
         </div>
 
+        <div id="viewAyuda" class="hidden max-w-[1000px] mx-auto">
+            <h2 class="text-3xl font-bold mb-8 text-slate-100">Ayuda</h2>
+
+            <div class="card p-8 mb-6">
+                <h3 class="text-xl font-bold mb-4 text-slate-100">📖 Manual de uso</h3>
+                <ol class="text-sm text-slate-300 space-y-2" style="list-style: decimal; padding-left: 20px;">
+                    <li><strong>Buscar / Cargar</strong>: escribe una palabra clave para consultar en vivo el catálogo de datos.gov.co, o sube tu propio Excel/CSV/JSON.</li>
+                    <li><strong>Revisa el plan del panel</strong>: el sistema perfila las columnas y propone KPIs, gráficos y tablas — marca/desmarca lo que quieras incluir y cambia el tipo de gráfico si prefieres otro.</li>
+                    <li><strong>Genera el Lienzo</strong> y descárgalo en PDF cuando quieras.</li>
+                    <li><strong>Análisis IA</strong>: aquí están el comparador de pares, la estadística real (desviación estándar, correlación, atípicos), la proyección con rango de confianza, y las referencias externas.</li>
+                    <li><strong>Chat</strong> (ícono 💬 abajo a la derecha): preguntas rápidas se responden al instante; preguntas más abiertas las responde el Narrador Experto con IA real.</li>
+                </ol>
+
+                <h4 class="text-sm font-bold text-violet-400 uppercase mt-6 mb-2">APIs con las que trabajamos</h4>
+                <ul class="text-sm text-slate-300 space-y-1" style="list-style: disc; padding-left: 20px;">
+                    <li><code class="text-xs bg-slate-800 px-1 rounded">datos.gov.co/api/catalog/v1</code> — búsqueda en vivo de datasets en todo el catálogo nacional.</li>
+                    <li><code class="text-xs bg-slate-800 px-1 rounded">datos.gov.co/resource/{'{'}id{'}'}.json</code> — API Socrata (SODA) para traer los datos reales del dataset elegido, hasta 50.000 filas.</li>
+                    <li><code class="text-xs bg-slate-800 px-1 rounded">datos.gov.co/api/views/{'{'}id{'}'}.json</code> — metadatos reales: vistas, descargas, entidad publicadora, fechas.</li>
+                    <li><code class="text-xs bg-slate-800 px-1 rounded">es.wikipedia.org/w/api.php</code> — resumen de contexto sobre la entidad/lugar detectado (opcional, asíncrono).</li>
+                    <li>Webhook propio de n8n — conecta el chat con el modelo de lenguaje del Narrador Experto.</li>
+                </ul>
+
+                <h4 class="text-sm font-bold text-violet-400 uppercase mt-6 mb-2">Variantes de análisis disponibles</h4>
+                <p class="text-sm text-slate-300">Gráficos: barras verticales, barras horizontales, líneas, anillo, área polar y dispersión. Agregaciones: suma, promedio y conteo — el sistema elige la más sensata según el tipo de columna (por ejemplo, promedia en vez de sumar cuando detecta una columna tipo tasa o porcentaje) y el usuario puede cambiarla.</p>
+
+                <h4 class="text-sm font-bold text-violet-400 uppercase mt-6 mb-2">Modelo predictivo</h4>
+                <p class="text-sm text-slate-300">Se usa un solo método, siempre el mismo, por transparencia: <strong>tasa de crecimiento promedio</strong> entre los periodos históricos, aplicada al último valor conocido, con un rango de <strong>± 1 desviación estándar</strong> de esa tasa. Se aplica cuando hay al menos una columna de fecha y una medida numérica con 2 o más periodos. No es un modelo de machine learning entrenado — es una decisión deliberada para que cualquier persona pueda entender y verificar de dónde sale la cifra.</p>
+            </div>
+
+            <div class="card p-8 mb-6">
+                <h3 class="text-xl font-bold mb-4 text-slate-100">👥 Sobre nosotros</h3>
+                <p class="text-sm text-slate-300">Rosal BI es un proyecto de la Alcaldía de El Rosal, Cundinamarca, desarrollado para el Concurso Datos al Ecosistema 2026 — Innovación y Tecnología (Ministerio TIC). Buscamos cerrar la brecha entre "el dato existe" y "el dato se entiende", para que cualquier ciudadano o funcionario público pueda tomar decisiones informadas sin depender de conocimientos técnicos ni licencias costosas.</p>
+            </div>
+
+            <div class="card p-8 mb-6">
+                <h3 class="text-xl font-bold mb-4 text-slate-100">💬 Preguntas frecuentes</h3>
+                <div class="space-y-4 text-sm">
+                    <div><p class="font-semibold text-slate-200">¿Mis datos se suben a algún servidor?</p><p class="text-slate-400">No. El análisis, el plan del panel y el PDF corren 100% en tu navegador. Las únicas llamadas externas son a datos.gov.co, Wikipedia (opcional), y al chat si lo usas.</p></div>
+                    <div><p class="font-semibold text-slate-200">¿Por qué el chat tarda más la primera vez?</p><p class="text-slate-400">El primer mensaje de cada dataset manda el contexto completo para que el Narrador Experto pueda responder sobre cualquier categoría. Los mensajes siguientes son más rápidos.</p></div>
+                    <div><p class="font-semibold text-slate-200">¿Sirve para otro municipio?</p><p class="text-slate-400">Sí — la arquitectura es agnóstica a qué portal de datos abiertos se use, siempre que tenga una API tipo Socrata o DKAN.</p></div>
+                    <div><p class="font-semibold text-slate-200">¿Qué tan confiable es la proyección?</p><p class="text-slate-400">Es un método estadístico simple y transparente (ver "Modelo predictivo" arriba), no un modelo entrenado — por diseño, para que sea explicable.</p></div>
+                </div>
+            </div>
+
+            <div class="card p-8">
+                <h3 class="text-xl font-bold mb-4 text-slate-100">🔗 Repositorio</h3>
+                <p class="text-sm text-slate-300 mb-3">Todo el código fuente, la documentación técnica y la metodología están públicos:</p>
+                <a href="https://github.com/gonxin2025/Rosal-BI" target="_blank" class="text-violet-400 hover:underline font-medium">github.com/gonxin2025/Rosal-BI →</a>
+            </div>
+        </div>
+
         <div id="loadingMessage" class="hidden text-center text-slate-400 mt-10">
             <p class="text-lg font-medium" id="loadingText">Procesando...</p>
+
             <div class="animate-spin mt-4 mx-auto rounded-full h-10 w-10 border-b-2 border-violet-500"></div>
         </div>
     </main>
@@ -524,14 +577,17 @@
             document.getElementById('viewPanel').classList.add('hidden');
             document.getElementById('viewInsights').classList.add('hidden');
             document.getElementById('viewData').classList.add('hidden');
+            document.getElementById('viewAyuda').classList.add('hidden');
             document.getElementById('nav-plan').className = "nav-item";
             document.getElementById('nav-panel').className = "nav-item";
             document.getElementById('nav-insights').className = "nav-item";
             document.getElementById('nav-data').className = "nav-item";
+            document.getElementById('nav-ayuda').className = "nav-item";
             if(tab === 'plan') { document.getElementById('viewPlan').classList.remove('hidden'); document.getElementById('nav-plan').className = "nav-item active"; }
             else if(tab === 'panel') { document.getElementById('viewPanel').classList.remove('hidden'); document.getElementById('nav-panel').className = "nav-item active"; }
             else if(tab === 'insights') { document.getElementById('viewInsights').classList.remove('hidden'); document.getElementById('nav-insights').className = "nav-item active"; }
             else if(tab === 'data') { document.getElementById('viewData').classList.remove('hidden'); document.getElementById('nav-data').className = "nav-item active"; }
+            else if(tab === 'ayuda') { document.getElementById('viewAyuda').classList.remove('hidden'); document.getElementById('nav-ayuda').className = "nav-item active"; }
             // En movil, cierra el menu lateral automaticamente al navegar
             if (window.innerWidth <= 900) {
                 document.getElementById('sidebar').classList.remove('open');
@@ -923,6 +979,7 @@
         function generateInsights() {
             let html = `<div class="card p-8"><h2 class="text-2xl font-bold text-slate-100 mb-8 flex items-center gap-2">🤖 Análisis Predictivo e Interpretación</h2>`;
             let tr = currentData.length, dc = getDomainContext();
+            let huboProyeccion = false;
             html += `<div class="insight-card mb-6"><div class="insight-title">📊 Resumen General</div><p class="insight-text">Rosal BI procesó <strong>${numberFormatter.format(tr)} registros</strong> de "${cleanTitle(currentTitle)}". Identificó ${profile.dates.length} fechas, ${profile.dimensions.length} dimensiones y ${profile.measures.length} medidas. ${dc ? `<em>Contexto general:</em> ${dc}` : ""}</p></div>`;
 
             // --- A: Estadistica descriptiva real, calculada sobre los datos cargados ---
@@ -950,6 +1007,7 @@
                     let pd = calcPred(c.cat, c.val);
                     if(pd.length > 1 && pd[pd.length-1].isPrediction) {
                         let p = pd[pd.length-1];
+                        huboProyeccion = true;
                         if (p.rangeLow !== undefined && Math.abs(p.rangeHigh - p.rangeLow) > Math.abs(p.value) * 0.02) {
                             ph = ` Se estima que para <strong>${p.label}</strong> el valor esté entre <strong>${numberFormatter.format(p.rangeLow.toFixed(0))}</strong> y <strong>${numberFormatter.format(p.rangeHigh.toFixed(0))}</strong> (rango según qué tan estable ha sido la tendencia histórica).`;
                         } else {
@@ -968,6 +1026,10 @@
                     }
                 }
             });
+
+            if (huboProyeccion) {
+                html += `<div class="insight-card mb-6" style="border-left-color: #64748b; background:#1e293b;"><div class="insight-title" style="color:#94a3b8; font-size:14px;">ℹ️ ¿Cómo se calculó la proyección?</div><p class="insight-text">Método: <strong>tasa de crecimiento promedio</strong> entre los periodos históricos disponibles, aplicada al último valor conocido. El rango que ves (cuando aparece) es de <strong>± 1 desviación estándar</strong> de esa tasa de crecimiento — se ensancha si la tendencia ha sido volátil, y se estrecha si ha sido estable. Es un método estadístico simple y transparente a propósito: no usa un modelo de machine learning entrenado ni series de tiempo complejas (como ARIMA), para que cualquier funcionario pueda entender y verificar de dónde sale la cifra. Hoy se aplica el mismo método a cualquier dataset con fechas y una medida — elegir automáticamente un método distinto según el patrón de los datos es un paso que dejamos documentado como mejora futura.</p></div>`;
+            }
 
             html += `</div>`;
             html += `<div id="externalRefsContainer"></div>`;

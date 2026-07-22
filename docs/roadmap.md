@@ -41,6 +41,13 @@ semana de agosto de 2026, en el marco de GovCamps 2026.
       validación de formato abierto.
 - [x] Presentación para el jurado (`presentacion/`), con la identidad
       visual real integrada en las 10 diapositivas.
+- [x] Pestaña "❓ Ayuda" dentro de la app: manual de uso, APIs y
+      variantes de análisis documentadas, explicación del modelo
+      predictivo, sobre nosotros, preguntas frecuentes, y enlace al
+      repositorio.
+- [x] Nota de transparencia sobre el método de proyección, visible
+      directamente en la pestaña de Análisis IA cuando aparece una
+      proyección.
 
 ## En curso / pendiente
 
@@ -54,6 +61,12 @@ semana de agosto de 2026, en el marco de GovCamps 2026.
       nunca para reinterpretar lo que ya está graficado. El DANE no
       tiene una API estructurada como datos.gov.co, así que esto
       requiere diseño cuidadoso antes de construirlo.
+- [ ] Selección dinámica de modelo predictivo: hoy se usa un único
+      método (tasa de crecimiento promedio) para cualquier dataset, por
+      transparencia. Evaluar que el sistema elija entre varios métodos
+      según el patrón de los datos (ej. estacionalidad) — decisión
+      pospuesta a propósito para no introducir complejidad sin probar
+      a fondo tan cerca de la entrega.
 - [ ] Poblar `datasets/catalogo.csv` con el inventario real de datasets
       del municipio.
 - [ ] Agregar capturas de pantalla reales del dashboard en

@@ -18,3 +18,12 @@ con lo que el jurado ve en la demo en vivo.
 > Si renombras el archivo a algo como `Rosal_BI_Presentacion.pptx` para
 > que el nombre del archivo también use la marca "Rosal BI", actualiza
 > esta línea y la referencia en `README.md` de la raíz.
+
+## Material de apoyo adicional
+
+- `guion-presentacion.md` — texto sugerido para cada integrante del
+  equipo, mapeado a las diapositivas exactas que le corresponden,
+  calculado para no pasar de 2 minutos por persona.
+- `preguntas-tecnicas.md` — respuestas rápidas a preguntas técnicas
+  frecuentes de un jurado (arquitectura, IA, seguridad, estadística,
+  escalabilidad), incluida una sección honesta de limitaciones.

@@ -6,8 +6,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] — Estructura de repositorio alineada con la guía avanzada de MinTIC
+
+### Agregado
+- `docs/planteamiento_problema.md`, `docs/marco_metodologico.md` (renombrado de `metodologia.md`), `docs/fuentes_datos.md`, `docs/data_dictionary.md`, `docs/validacion_guide.md`, `docs/conclusiones.md`.
+- `docs/public_impact_assessment.md` (reemplaza `impacto.md`): impacto + nueva sección de ética y mitigación de sesgos.
+- `tests/`: 3 scripts reales de Puppeteer (PDF, columnas tipo tasa, rendimiento con 10.000 filas) que reproducen y verifican la corrección de los bugs documentados, más `README.md` explicando la metodología de pruebas.
+- Nota explícita en `docs/README.md` y en el README raíz sobre por qué no existen `notebooks/`, `models/`, `deployments/`, `config/` — la plantilla sugerida por MinTIC asume un proyecto Python/ML con modelos entrenados; Rosal BI es frontend puro con un Agente de IA vía n8n, por decisión de diseño.
+
 ### Por hacer
 - Registrar el proyecto en https://herramientas.datos.gov.co/usos (requisito del concurso).
+
+## [0.5.1] — Transparencia del modelo predictivo y pestaña de Ayuda
+
+### Agregado
+- Nueva pestaña "❓ Ayuda" en la app: manual de uso, APIs y variantes de análisis documentadas, explicación del modelo predictivo, sobre nosotros, preguntas frecuentes, y enlace al repositorio.
+- Nota de transparencia visible en la pestaña de Análisis IA explicando el método de proyección (tasa de crecimiento promedio ± 1 desviación estándar) cada vez que aparece una proyección.
+- `presentacion/guion-presentacion.md` y `presentacion/preguntas-tecnicas.md`: material de apoyo para la exposición ante el jurado.
+
+### Decisión documentada
+- Se evaluó que la IA eligiera dinámicamente el método de proyección según el patrón de los datos. Se pospuso a propósito: se prefiere un único método simple y transparente sobre uno adaptativo, para no introducir complejidad sin probar a fondo cerca de la entrega. Queda en `docs/roadmap.md` como mejora futura.
 
 ## [0.5.0] — Rosal BI: rediseño completo, estadística real, IA conectada
 

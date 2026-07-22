@@ -1,0 +1,15 @@
+{
+  "name": "rosal-bi-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pruebas reales de extremo a extremo para Rosal BI, con navegador real via Puppeteer.",
+  "scripts": {
+    "test:pdf": "node test-pdf-export.js",
+    "test:rates": "node test-rate-columns.js",
+    "test:perf": "node test-statistical-performance.js",
+    "test:all": "npm run test:pdf && npm run test:rates && npm run test:perf"
+  },
+  "devDependencies": {
+    "puppeteer": "^22.0.0"
+  }
+}
