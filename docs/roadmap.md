@@ -48,32 +48,36 @@ semana de agosto de 2026, en el marco de GovCamps 2026.
 - [x] Nota de transparencia sobre el método de proyección, visible
       directamente en la pestaña de Análisis IA cuando aparece una
       proyección.
+- [x] **Registro del proyecto en herramientas.datos.gov.co/usos** —
+      completado.
+- [x] **Equipo confirmado**: Luzaira Henao (Jefa de TICs, líder del
+      equipo), e ingenieros Luis Sandoval, Kevin Ramírez e Iván
+      Bermúdez.
+- [x] Bug real corregido: la exportación a PDF cortaba gráficas y
+      tablas a la mitad cuando el corte de página caía en medio de una
+      tarjeta. Ahora el corte se ajusta automáticamente al inicio de la
+      siguiente tarjeta — ver `tests/` y `frontend/dashboard/README.md`.
+- [x] Botón de regresión lineal para proyecciones: aparece solo cuando
+      hay 8 o más periodos históricos válidos (criterio de
+      elegibilidad), como alternativa transparente al método por
+      defecto (tasa de crecimiento promedio) — el usuario elige cuál
+      ver, nunca lo decide una IA. Documentado en
+      `docs/data_dictionary.md` y en la pestaña de Ayuda de la app.
 
 ## En curso / pendiente
 
-- [ ] **Registrar el proyecto en https://herramientas.datos.gov.co/usos**
-      — requisito obligatorio de los términos del concurso, no solo
-      recomendado. Sin esto, el proyecto no avanza en la evaluación.
 - [ ] Evaluar herramientas para enriquecer las proyecciones con
       información externa reciente (búsqueda restringida a dominios
       oficiales tipo Tavily, o extender la búsqueda de datasets
       relacionados) — solo para el párrafo de proyección/estimado,
       nunca para reinterpretar lo que ya está graficado. El DANE no
       tiene una API estructurada como datos.gov.co, así que esto
-      requiere diseño cuidadoso antes de construirlo.
-- [ ] Selección dinámica de modelo predictivo: hoy se usa un único
-      método (tasa de crecimiento promedio) para cualquier dataset, por
-      transparencia. Evaluar que el sistema elija entre varios métodos
-      según el patrón de los datos (ej. estacionalidad) — decisión
-      pospuesta a propósito para no introducir complejidad sin probar
-      a fondo tan cerca de la entrega.
+      requiere diseño cuidadoso antes de construirlo. Sigue en
+      evaluación, sin decisión de construcción todavía.
 - [ ] Poblar `datasets/catalogo.csv` con el inventario real de datasets
       del municipio.
 - [ ] Agregar capturas de pantalla reales del dashboard en
       `docs/capturas/` e `images/mockups/`.
-- [ ] Confirmar que el equipo cumple los requisitos administrativos del
-      concurso (mínimo una integrante mujer, perfil de ciencia de
-      datos/analítica) — esto no se resuelve en el repositorio.
 - [ ] Definir si se necesita backend propio (`backend/`) más allá del
       frontend actual y del webhook de n8n.
 - [ ] Diseñar los dashboards temáticos (`dashboards/`) para cada sector:

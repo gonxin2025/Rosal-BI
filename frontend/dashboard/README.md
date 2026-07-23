@@ -63,6 +63,23 @@ una vez al regenerar el archivo)
   Se detectan columnas tipo tasa por nombre y se promedian por defecto,
   con rechazo de valores fuera de un rango razonable (protege contra
   errores de formato/exportación del dataset original).
+- **PDF cortando gráficas/tablas a la mitad**: el corte de página caía
+  a veces en medio de una tarjeta. Se calculan los límites reales de
+  cada KPI/gráfica/tabla y el corte se ajusta al inicio del siguiente
+  bloque, en vez de partirlo.
+- **Columnas identificadoras clasificadas como fecha**: una columna
+  como `codigomunicipio` o `codigovigencia` contiene "cod" (debería
+  excluirse como identificador) pero también podía coincidir con los
+  patrones de detección de fecha (4 dígitos, o la palabra "vigencia" en
+  el nombre) — y la lógica nunca revisaba si ya era un identificador
+  antes de marcarla como fecha. Producía "tendencias" sin sentido
+  comparando códigos de municipio como si fueran años. Corregido:
+  ningún identificador puede clasificarse como fecha.
+- **Números grandes mal interpretados como fecha**: `Date.parse("201500")`
+  en JavaScript lo interpreta como "el año 201500" — cualquier columna
+  numérica con valores grandes podía colarse como fecha por accidente.
+  Corregido: el reconocimiento de fecha por `Date.parse()` ya no se
+  intenta sobre columnas puramente numéricas.
 
 ## Pendiente
 

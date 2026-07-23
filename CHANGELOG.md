@@ -6,6 +6,26 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.1] — Corrección de clasificación de columnas (identificadores mal detectados como fecha)
+
+### Corregido
+- Bug real, encontrado probando con un dataset real de presupuesto de la Contraloría: columnas identificadoras (`codigomunicipio`, `codigovigencia`, cualquier nombre con "id"/"cod") se clasificaban como columnas de Fecha porque coincidían con los patrones de detección (4 dígitos, o "vigencia" en el nombre) sin revisar primero si ya eran un identificador. Producía "tendencias" sin sentido comparando códigos de municipio como si fueran años.
+- Bug relacionado: `Date.parse()` de JavaScript interpreta números grandes como años absurdos (`Date.parse("201500")` es válido) — una medida numérica con valores grandes podía colarse como fecha por accidente. Ahora ese reconocimiento solo se intenta sobre columnas no puramente numéricas.
+- Nuevo `tests/test-column-classification.js` reproduce y verifica ambos casos.
+
+## [0.7.0] — Regresión lineal opcional, corrección de PDF, especificación de dashboards temáticos
+
+### Agregado
+- Botón "📈 Ver con regresión lineal" en la pestaña Análisis IA — aparece solo con 8+ periodos históricos válidos (criterio de elegibilidad), como alternativa transparente al método por defecto. El usuario elige, nunca una IA. Documentado en detalle en `docs/data_dictionary.md`.
+- Especificación real (dataset sugerido + KPIs + gráficos) para los 7 dashboards temáticos en `dashboards/` — reemplaza los placeholders vacíos.
+
+### Corregido
+- Bug real: la exportación a PDF cortaba gráficas y tablas a la mitad cuando el corte de página caía en medio de una tarjeta. Ahora el algoritmo detecta los límites reales de cada KPI/gráfica/tabla y ajusta el corte al inicio del siguiente bloque — verificado con un dataset de 500 filas que generó 4 páginas, 7 bloques protegidos, cero cortes problemáticos.
+
+### Actualizado
+- `docs/roadmap.md`: registro en herramientas.datos.gov.co/usos y confirmación del equipo (Luzaira Henao, líder; ingenieros Luis Sandoval, Kevin Ramírez, Iván Bermúdez) marcados como completados.
+- Nota de transparencia y pestaña de Ayuda actualizadas para explicar ambos métodos de proyección.
+
 ## [0.6.0] — Estructura de repositorio alineada con la guía avanzada de MinTIC
 
 ### Agregado

@@ -7,7 +7,8 @@
     "test:pdf": "node test-pdf-export.js",
     "test:rates": "node test-rate-columns.js",
     "test:perf": "node test-statistical-performance.js",
-    "test:all": "npm run test:pdf && npm run test:rates && npm run test:perf"
+    "test:columns": "node test-column-classification.js",
+    "test:all": "npm run test:pdf && npm run test:rates && npm run test:perf && npm run test:columns"
   },
   "devDependencies": {
     "puppeteer": "^22.0.0"

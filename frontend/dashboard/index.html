@@ -323,7 +323,7 @@
                 <p class="text-sm text-slate-300">Gráficos: barras verticales, barras horizontales, líneas, anillo, área polar y dispersión. Agregaciones: suma, promedio y conteo — el sistema elige la más sensata según el tipo de columna (por ejemplo, promedia en vez de sumar cuando detecta una columna tipo tasa o porcentaje) y el usuario puede cambiarla.</p>
 
                 <h4 class="text-sm font-bold text-violet-400 uppercase mt-6 mb-2">Modelo predictivo</h4>
-                <p class="text-sm text-slate-300">Se usa un solo método, siempre el mismo, por transparencia: <strong>tasa de crecimiento promedio</strong> entre los periodos históricos, aplicada al último valor conocido, con un rango de <strong>± 1 desviación estándar</strong> de esa tasa. Se aplica cuando hay al menos una columna de fecha y una medida numérica con 2 o más periodos. No es un modelo de machine learning entrenado — es una decisión deliberada para que cualquier persona pueda entender y verificar de dónde sale la cifra.</p>
+                <p class="text-sm text-slate-300">Dos métodos disponibles, ambos deterministas — el usuario elige, nunca una IA. Por defecto: <strong>tasa de crecimiento promedio</strong> entre los periodos históricos, con un rango de <strong>± 1 desviación estándar</strong>. Con <strong>8 o más periodos</strong> válidos, aparece un botón para ver la proyección con <strong>regresión lineal</strong> en su lugar — usa todos los puntos históricos a la vez, con un intervalo de predicción formal. Ninguno es un modelo de machine learning entrenado — decisión deliberada para que cualquier persona pueda entender y verificar de dónde sale la cifra.</p>
             </div>
 
             <div class="card p-8 mb-6">
@@ -466,6 +466,15 @@
         // repitamos cada vez.
         let chatSessionId = null;
         let chatContextSent = false;
+        // Recuerda, por grafica, si el usuario eligio ver la proyeccion con
+        // regresion lineal en vez del metodo por defecto (tasa de crecimiento
+        // promedio). Se reinicia solo, sin querer, cuando se genera el
+        // lienzo desde cero.
+        let metodoProyeccionPorGrafica = {};
+        function toggleMetodoProyeccion(chartId) {
+            metodoProyeccionPorGrafica[chartId] = metodoProyeccionPorGrafica[chartId] === 'lineal' ? 'promedio' : 'lineal';
+            generateInsights();
+        }
         let currentMetadata = {};
         
         let proposedKPIs = [], proposedCharts = [], proposedTables = [];
@@ -705,7 +714,7 @@
                 for(let row of sample) { let v = row[col]; if(v === null || v === '') continue; nonNull++; if(isNaN(parseFloat(v))) isNum = false; if(!/^\d{4}$/.test(String(v))) isYr = false; }
                 if(nonNull === 0) return;
                 let isDateName = l.includes('fecha') || l.includes('a_o') || l.includes('ano') || l === 'year' || l.includes('vigencia');
-                if(isYr && nonNull > 1) isDate = true; else if (isDateName) isDate = true; else if (!isNaN(Date.parse(sample[0][col])) && String(sample[0][col]).length > 4) isDate = true;
+                if(!isId && isYr && nonNull > 1) isDate = true; else if (!isId && isDateName) isDate = true; else if (!isId && !isNum && !isNaN(Date.parse(sample[0][col])) && String(sample[0][col]).length > 4) isDate = true;
                 if(isDate) profile.dates.push(col);
                 else if(isNum && !isId) profile.measures.push(col);
                 else if (!isId && String(sample[0][col]).length < 50) profile.dimensions.push(col);
@@ -1004,17 +1013,26 @@
                 let d = aggregateData(c.cat, c.val, c.op), isD = profile.dates.includes(c.cat);
                 if (isD && d.length > 1) {
                     d.sort((a, b) => String(a.label).localeCompare(String(b.label))); let f = d[0], l = d[d.length - 1], g = f.value > 0 ? (((l.value - f.value) / f.value) * 100) : 0, tt = g > 0 ? 'un incremento' : (g < 0 ? 'una disminución' : 'una estabilidad'), ct = getTimeContext(f.label) + " " + getTimeContext(l.label), ph = "";
-                    let pd = calcPred(c.cat, c.val);
+                    const usaLineal = metodoProyeccionPorGrafica[c.id] === 'lineal';
+                    let pd = usaLineal ? calcPredLineal(c.cat, c.val) : calcPred(c.cat, c.val);
+                    let botonMetodo = "";
+                    if (esElegibleParaRegresion(c.cat, c.val)) {
+                        huboProyeccion = true;
+                        botonMetodo = usaLineal
+                            ? `<button onclick="toggleMetodoProyeccion('${c.id}')" class="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded ml-2 hover:bg-slate-600">↩️ Ver con tasa de crecimiento</button>`
+                            : `<button onclick="toggleMetodoProyeccion('${c.id}')" class="text-xs bg-violet-700 text-white px-2 py-1 rounded ml-2 hover:bg-violet-600">📈 Ver con regresión lineal (hay suficiente historia para esto)</button>`;
+                    }
                     if(pd.length > 1 && pd[pd.length-1].isPrediction) {
                         let p = pd[pd.length-1];
                         huboProyeccion = true;
+                        const metodoLabel = usaLineal ? "regresión lineal" : "tasa de crecimiento promedio";
                         if (p.rangeLow !== undefined && Math.abs(p.rangeHigh - p.rangeLow) > Math.abs(p.value) * 0.02) {
-                            ph = ` Se estima que para <strong>${p.label}</strong> el valor esté entre <strong>${numberFormatter.format(p.rangeLow.toFixed(0))}</strong> y <strong>${numberFormatter.format(p.rangeHigh.toFixed(0))}</strong> (rango según qué tan estable ha sido la tendencia histórica).`;
+                            ph = ` Se estima (método: ${metodoLabel}) que para <strong>${p.label}</strong> el valor esté entre <strong>${numberFormatter.format(p.rangeLow.toFixed(0))}</strong> y <strong>${numberFormatter.format(p.rangeHigh.toFixed(0))}</strong>.`;
                         } else {
-                            ph = ` Se estima que para <strong>${p.label}</strong> el valor sea aproximadamente <strong>${numberFormatter.format(p.value.toFixed(0))}</strong>.`;
+                            ph = ` Se estima (método: ${metodoLabel}) que para <strong>${p.label}</strong> el valor sea aproximadamente <strong>${numberFormatter.format(p.value.toFixed(0))}</strong>.`;
                         }
                     }
-                    html += `<div class="insight-card mb-6" style="border-left-color: #06b6d4;"><div class="insight-title" style="color: #06b6d4;">📅 Tendencia: ${cleanTitle(c.title)}</div><p class="insight-text">Muestra ${tt} del <strong>${Math.abs(g).toFixed(1)}%</strong> comparando <strong>${f.label}</strong> (${numberFormatter.format(f.value.toFixed(0))}) con <strong>${l.label}</strong> (${numberFormatter.format(l.value.toFixed(0))}).${ph} ${ct}</p></div>`;
+                    html += `<div class="insight-card mb-6" style="border-left-color: #06b6d4;"><div class="insight-title" style="color: #06b6d4;">📅 Tendencia: ${cleanTitle(c.title)}${botonMetodo}</div><p class="insight-text">Muestra ${tt} del <strong>${Math.abs(g).toFixed(1)}%</strong> comparando <strong>${f.label}</strong> (${numberFormatter.format(f.value.toFixed(0))}) con <strong>${l.label}</strong> (${numberFormatter.format(l.value.toFixed(0))}).${ph} ${ct}</p></div>`;
                 } else if (d.length > 0) {
                     let t1 = d[0], t2 = d[1] || {label: 'N/A', value: 0}, b1 = d[d.length - 1], ts = d.reduce((a, b) => a + b.value, 0), pt = ts > 0 ? ((t1.value / ts) * 100).toFixed(1) : 0, mt = c.val ? `el valor de <strong>${c.val}</strong>` : `los registros`, ot = c.val ? `sumando` : `contabilizando`, ctT = getGeoContext(t1.label), ctB = getGeoContext(b1.label);
                     html += `<div class="insight-card mb-6"><div class="insight-title">🎯 Hallazgo: ${cleanTitle(c.title)}</div><p class="insight-text">"<strong>${t1.label}</strong>" concentra la mayor proporción, ${ot} <strong>${numberFormatter.format(t1.value.toFixed(0))}</strong> (<strong>${pt}%</strong>). Le sigue "<strong>${t2.label}</strong>". "<strong>${b1.label}</strong>" tiene la menor participación.${dc ? ` <em>Contexto general:</em> ${dc}` : ""}</p></div>`;
@@ -1028,7 +1046,7 @@
             });
 
             if (huboProyeccion) {
-                html += `<div class="insight-card mb-6" style="border-left-color: #64748b; background:#1e293b;"><div class="insight-title" style="color:#94a3b8; font-size:14px;">ℹ️ ¿Cómo se calculó la proyección?</div><p class="insight-text">Método: <strong>tasa de crecimiento promedio</strong> entre los periodos históricos disponibles, aplicada al último valor conocido. El rango que ves (cuando aparece) es de <strong>± 1 desviación estándar</strong> de esa tasa de crecimiento — se ensancha si la tendencia ha sido volátil, y se estrecha si ha sido estable. Es un método estadístico simple y transparente a propósito: no usa un modelo de machine learning entrenado ni series de tiempo complejas (como ARIMA), para que cualquier funcionario pueda entender y verificar de dónde sale la cifra. Hoy se aplica el mismo método a cualquier dataset con fechas y una medida — elegir automáticamente un método distinto según el patrón de los datos es un paso que dejamos documentado como mejora futura.</p></div>`;
+                html += `<div class="insight-card mb-6" style="border-left-color: #64748b; background:#1e293b;"><div class="insight-title" style="color:#94a3b8; font-size:14px;">ℹ️ ¿Cómo se calculó la proyección?</div><p class="insight-text">Método por defecto: <strong>tasa de crecimiento promedio</strong> entre los periodos históricos disponibles, aplicada al último valor conocido, con un rango de <strong>± 1 desviación estándar</strong> de esa tasa. Cuando hay <strong>8 o más periodos</strong> con datos válidos, aparece un botón para ver la proyección con <strong>regresión lineal</strong> en su lugar — un método que usa todos los puntos históricos a la vez, con un intervalo de predicción formal (basado en el error estándar de la regresión). Ninguno de los dos es un modelo de machine learning entrenado ni series de tiempo complejas (como ARIMA): se prefirieron métodos simples y verificables a mano, para que cualquier funcionario pueda entender de dónde sale la cifra. Elegir automáticamente entre más métodos según el patrón de los datos queda documentado como mejora futura.</p></div>`;
             }
 
             html += `</div>`;
@@ -1150,6 +1168,63 @@
             return r;
         }
 
+        /*
+          Criterio de elegibilidad para el metodo alternativo (regresion
+          lineal): se necesitan al menos 8 periodos historicos validos.
+          Con menos, ofrecer regresion lineal seria fingir un rigor que
+          los datos no respaldan -- el boton simplemente no aparece.
+        */
+        const MIN_PERIODOS_REGRESION = 8;
+        function esElegibleParaRegresion(dC, vC) {
+            const op = vC && isRateLikeColumn(vC) ? 'avg' : 'sum';
+            const a = aggregateData(dC, vC, op);
+            return a.length >= MIN_PERIODOS_REGRESION;
+        }
+
+        /*
+          Regresion lineal simple (minimos cuadrados) sobre TODOS los
+          periodos historicos, con un intervalo de prediccion formal
+          (basado en el error estandar de la regresion) -- a diferencia
+          del metodo por defecto (tasa de crecimiento promedio entre
+          periodos consecutivos), esta usa cada punto historico, no solo
+          las variaciones entre periodos consecutivos. Sigue siendo 100%
+          determinista: ningun numero lo calcula ni lo ajusta una IA.
+        */
+        function calcPredLineal(dC, vC) {
+            const op = vC && isRateLikeColumn(vC) ? 'avg' : 'sum';
+            let a = aggregateData(dC, vC, op);
+            a.sort((a, b) => String(a.label).localeCompare(String(b.label)));
+            if (a.length < MIN_PERIODOS_REGRESION) return a.map(d => ({...d, trend: 'flat', isPrediction: false}));
+
+            const n = a.length;
+            const xs = a.map((_, i) => i);
+            const ys = a.map(d => d.value);
+            const xBar = xs.reduce((s, x) => s + x, 0) / n;
+            const yBar = ys.reduce((s, y) => s + y, 0) / n;
+            let sxy = 0, sxx = 0;
+            for (let i = 0; i < n; i++) { sxy += (xs[i] - xBar) * (ys[i] - yBar); sxx += (xs[i] - xBar) ** 2; }
+            const b = sxx !== 0 ? sxy / sxx : 0;
+            const intercepto = yBar - b * xBar;
+
+            // Error estandar de la regresion (que tan lejos caen los puntos reales de la recta)
+            let sse = 0;
+            for (let i = 0; i < n; i++) { const yHat = intercepto + b * xs[i]; sse += (ys[i] - yHat) ** 2; }
+            const errorEstandar = n > 2 ? Math.sqrt(sse / (n - 2)) : 0;
+
+            const xPred = n; // el siguiente periodo
+            const pv = intercepto + b * xPred;
+            // Margen del intervalo de prediccion: incorpora tanto el error de ajuste
+            // como la incertidumbre de proyectar un punto nuevo (formula estandar de
+            // intervalo de prediccion para regresion lineal simple).
+            const margen = errorEstandar * Math.sqrt(1 + 1/n + ((xPred - xBar) ** 2) / (sxx || 1));
+
+            const r = a.map((d, i) => ({ ...d, trend: i > 0 ? (d.value > a[i-1].value ? 'up' : (d.value < a[i-1].value ? 'down' : 'flat')) : 'flat', isPrediction: false }));
+            let ll = String(a[n-1].label), nl = ll, py = parseInt(ll.match(/\d{4}/));
+            if (py) nl = ll.replace(/\d{4}/, String(py + 1));
+            r.push({ label: nl, value: pv, rangeLow: pv - margen, rangeHigh: pv + margen, volatility: errorEstandar, trend: b > 0 ? 'up' : (b < 0 ? 'down' : 'flat'), isPrediction: true });
+            return r;
+        }
+
         function renderRawTableInCanvas() { let th = document.getElementById('canvasRawHead'), tb = document.getElementById('canvasRawBody'); th.innerHTML = ''; tb.innerHTML = ''; let tr = document.createElement('tr'); currentColumns.forEach(c => { let t = document.createElement('th'); t.innerText = c; t.style.padding = '8px'; t.style.borderBottom = '1px solid #e2e8f0'; tr.appendChild(t); }); th.appendChild(tr); let l = Math.min(currentData.length, 100); for(let i=0; i<l; i++) { let r = document.createElement('tr'); currentColumns.forEach(c => { let t = document.createElement('td'); t.innerText = currentData[i][c] || ''; t.style.padding = '8px'; t.style.borderBottom = '1px solid #e2e8f0'; r.appendChild(t); }); tb.appendChild(r); } }
         function aggregateData(cC, vC, op) { const rateLike = vC ? isRateLikeColumn(vC) : false; const g = {}; currentData.forEach(r => { let k = r[cC] || 'N/A'; if(String(k).length > 30) k = String(k).substring(0, 27) + '...'; if(!g[k]) g[k] = []; if (vC) { const n = safeParseNum(r[vC], rateLike); if (n !== null) g[k].push(n); } else { g[k].push(1); } }); let res = []; for(let k in g) { let a = g[k], f = 0; if(a.length === 0) continue; if(op === 'sum' || !vC) f = a.reduce((x, y) => x + y, 0); else if(op === 'avg') f = a.reduce((x, y) => x + y, 0) / a.length; else if(op === 'count') f = a.length; res.push({label: k, value: f}); } return res.sort((a, b) => b.value - a.value); }
         function renderDataTable() { let th = document.getElementById('tableHead'), tb = document.getElementById('tableBody'); th.innerHTML = ''; tb.innerHTML = ''; let tr = document.createElement('tr'); currentColumns.forEach(c => { let t = document.createElement('th'); t.innerText = c; t.style.padding = '12px 16px'; tr.appendChild(t); }); th.appendChild(tr); let l = Math.min(currentData.length, 500); for(let i=0; i<l; i++) { let r = document.createElement('tr'); currentColumns.forEach(c => { let t = document.createElement('td'); t.innerText = currentData[i][c] || ''; t.style.padding = '12px 16px'; t.style.borderBottom = '1px solid var(--border-color)'; r.appendChild(t); }); tb.appendChild(r); } }
@@ -1157,10 +1232,69 @@
         document.getElementById('downloadPdfBtn').addEventListener('click', function() {
             const btn = this; btn.innerText = "Generando PDF..."; btn.disabled = true;
             setTimeout(() => {
-                html2canvas(document.getElementById('executiveCanvas'), { scale: 2, backgroundColor: '#F8FAFC', logging: false }).then(canvas => {
+                const canvasElement = document.getElementById('executiveCanvas');
+                const canvasElementTop = canvasElement.getBoundingClientRect().top;
+
+                html2canvas(canvasElement, { scale: 2, backgroundColor: '#F8FAFC', logging: false }).then(canvas => {
                     const { jsPDF } = window.jspdf; const pdf = new jsPDF('l', 'mm', 'a4'); let pW = pdf.internal.pageSize.getWidth(), pH = pdf.internal.pageSize.getHeight(), iW = pW, iH = (canvas.height * iW) / canvas.width;
-                    if (iH <= pH) { pdf.addImage(canvas.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, iW, iH); } 
-                    else { let rH = iH, p = 0; while (rH > 0.5) { let pC = document.createElement('canvas'), pCtx = pC.getContext('2d'), pxM = canvas.width / iW, pHP = Math.floor(pH * pxM); pC.width = canvas.width; pC.height = Math.min(pHP, canvas.height - (p * pxM)); if (pC.height <= 0) break; pCtx.drawImage(canvas, 0, p * pxM, canvas.width, pC.height, 0, 0, canvas.width, pC.height); if (p > 0) pdf.addPage(); let cH = pC.height / pxM; pdf.addImage(pC.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, iW, cH); p += cH; rH -= cH; } }
+
+                    if (iH <= pH) { pdf.addImage(canvas.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, iW, iH); }
+                    else {
+                        const pxM = canvas.width / iW; // pixeles-de-canvas por mm
+
+                        // Elementos que NUNCA se deben cortar a la mitad al paginar: tarjetas
+                        // de KPI, gráficas y tablas. Se calcula su rango vertical (en pixeles
+                        // del canvas capturado) para poder "empujar" el corte de pagina antes
+                        // de que empiece cualquiera de estos, en vez de partirlo.
+                        const selectorNoCortar = '.kpi-card, .chart-card, .raw-table-premium';
+                        const bloques = [...canvasElement.querySelectorAll(selectorNoCortar)].map(el => {
+                            const r = el.getBoundingClientRect();
+                            const topPx = (r.top - canvasElementTop) * (canvas.height / canvasElement.offsetHeight);
+                            const bottomPx = (r.bottom - canvasElementTop) * (canvas.height / canvasElement.offsetHeight);
+                            return { top: topPx, bottom: bottomPx };
+                        });
+
+                        function ajustarCorte(candidatoPx) {
+                            // Si el corte candidato cae DENTRO de algun bloque protegido,
+                            // se mueve el corte justo al inicio de ese bloque -- asi el
+                            // bloque completo pasa a la siguiente pagina en vez de partirse.
+                            for (const b of bloques) {
+                                if (candidatoPx > b.top + 2 && candidatoPx < b.bottom - 2) {
+                                    return b.top;
+                                }
+                            }
+                            return candidatoPx;
+                        }
+
+                        let rH = iH, p = 0;
+                        while (rH > 0.5) {
+                            const pageHeightInPx = Math.floor(pH * pxM);
+                            const srcYPx = p * pxM;
+                            let candidatoFinPx = srcYPx + pageHeightInPx;
+                            let finAjustadoPx = ajustarCorte(Math.min(candidatoFinPx, canvas.height));
+
+                            // Salvavidas: si el ajuste dejara una pagina demasiado chica
+                            // (ej. una tarjeta mas alta que una pagina completa), se usa el
+                            // corte original sin ajustar para no quedarse trabado.
+                            if (finAjustadoPx - srcYPx < pageHeightInPx * 0.3) {
+                                finAjustadoPx = Math.min(candidatoFinPx, canvas.height);
+                            }
+
+                            const alturaPaginaPx = Math.round(finAjustadoPx - srcYPx);
+                            const pC = document.createElement('canvas'), pCtx = pC.getContext('2d');
+                            pC.width = canvas.width;
+                            pC.height = Math.min(alturaPaginaPx, canvas.height - srcYPx);
+                            if (pC.height <= 0) break;
+
+                            pCtx.drawImage(canvas, 0, srcYPx, canvas.width, pC.height, 0, 0, canvas.width, pC.height);
+                            const imgData = pC.toDataURL('image/jpeg', 0.9);
+                            if (p > 0) pdf.addPage();
+                            const cH = pC.height / pxM;
+                            pdf.addImage(imgData, 'JPEG', 0, 0, iW, cH);
+                            p += cH; rH -= cH;
+                        }
+                    }
+
                     pdf.save(`Lienzo_RosalBI.pdf`); btn.innerText = "📄 Descargar PDF"; btn.disabled = false;
                 }).catch(err => { console.error("Error PDF:", err); alert("Error al generar el PDF."); btn.innerText = "📄 Descargar PDF"; btn.disabled = false; });
             }, 100);

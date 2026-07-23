@@ -15,6 +15,7 @@ npm install puppeteer --save-dev
 node test-pdf-export.js
 node test-rate-columns.js
 node test-statistical-performance.js
+node test-column-classification.js
 ```
 
 Cada script carga `frontend/dashboard/index.html` en un navegador real
@@ -37,6 +38,13 @@ el esperado.
   estadístico (perfilado, KPIs, desviación estándar, correlación) no
   bloquea la interfaz ni siquiera con 10.000 filas sintéticas — mide el
   tiempo real de ejecución.
+- **`test-column-classification.js`** — reproduce el bug real donde
+  columnas identificadoras (`codigomunicipio`, `codigovigencia`) se
+  clasificaban como columnas de Fecha porque coincidían con los
+  patrones de detección (4 dígitos, o la palabra "vigencia" en el
+  nombre) sin revisar primero si ya eran un identificador. También
+  cubre el caso donde un número grande (ej. `201500`) era mal
+  interpretado por `Date.parse()` de JavaScript como un año.
 
 ## Por qué no hay `tests/unit/`, `tests/integration/`, `tests/bias_tests/` como carpetas separadas
 
